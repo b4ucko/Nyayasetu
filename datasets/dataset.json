@@ -1,0 +1,182 @@
+[
+    {
+        "id": 1,
+        "scheme_name": "Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)",
+        "category": "Agriculture",
+        "eligibility": "Small and marginal farmers with cultivable land up to 2 hectares.",
+        "benefits": "₹6,000 per year in three equal installments of ₹2,000 directly to bank accounts.",
+        "required_documents": ["Aadhar Card", "Bank Passbook", "Land Ownership Records"],
+        "ministry": "Ministry of Agriculture and Farmers Welfare"
+    },
+    {
+        "id": 2,
+        "scheme_name": "Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (AB-PMJAY)",
+        "category": "Healthcare",
+        "eligibility": "Poor, deprived rural families and identified occupational category of urban workers' families as per SECC 2011 data.",
+        "benefits": "Health cover of ₹5 lakh per family per year for secondary and tertiary care hospitalization.",
+        "required_documents": ["Aadhar Card", "Ration Card", "SECC Database Identification"],
+        "ministry": "Ministry of Health and Family Welfare"
+    },
+    {
+        "id": 3,
+        "scheme_name": "Mahatma Gandhi National Rural Employment Guarantee Act (MGNREGA)",
+        "category": "Employment",
+        "eligibility": "Adult members of any rural household willing to do public work-related unskilled manual work.",
+        "benefits": "At least 100 days of guaranteed wage employment in a financial year.",
+        "required_documents": ["Aadhar Card", "Voter ID", "Bank Account Details", "Job Card Application"],
+        "ministry": "Ministry of Rural Development"
+    },
+    {
+        "id": 4,
+        "scheme_name": "Pradhan Mantri Awas Yojana - Urban (PMAY-U)",
+        "category": "Housing",
+        "eligibility": "Economically Weaker Section (EWS), Low Income Group (LIG) and Middle Income Group (MIG) families residing in urban areas.",
+        "benefits": "Credit-linked subsidy on home loans, financial assistance for house construction/upgradation.",
+        "required_documents": ["Aadhar Card", "Income Certificate", "Bank Account Details", "Property Documents"],
+        "ministry": "Ministry of Housing and Urban Affairs"
+    },
+    {
+        "id": 5,
+        "scheme_name": "Pradhan Mantri Awas Yojana - Gramin (PMAY-G)",
+        "category": "Housing",
+        "eligibility": "Rural families who are houseless or living in zero, one or two room houses with kutcha wall and kutcha roof.",
+        "benefits": "Financial assistance of ₹1.20 lakh in plain areas and ₹1.30 lakh in hilly areas for house construction.",
+        "required_documents": ["Aadhar Card", "SECC Number", "Bank Account Details", "Swachh Bharat Mission Number"],
+        "ministry": "Ministry of Rural Development"
+    },
+    {
+        "id": 6,
+        "scheme_name": "Pradhan Mantri Jan Dhan Yojana (PMJDY)",
+        "category": "Finance",
+        "eligibility": "Any Indian citizen above 10 years of age.",
+        "benefits": "Zero-balance savings bank account, RuPay Debit card, accident insurance cover of ₹2 lakh, overdraft facility up to ₹10,000.",
+        "required_documents": ["Aadhar Card", "Passport Size Photograph"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 7,
+        "scheme_name": "Pradhan Mantri Ujjwala Yojana (PMUY)",
+        "category": "Energy",
+        "eligibility": "Adult woman belonging to a BPL family, SC/ST, PMAY households, Antyodaya Anna Yojana (AAY).",
+        "benefits": "Financial support of ₹1,600 for LPG connection to BPL households.",
+        "required_documents": ["Aadhar Card", "BPL Ration Card", "Bank Account Details", "Passport Size Photograph"],
+        "ministry": "Ministry of Petroleum and Natural Gas"
+    },
+    {
+        "id": 8,
+        "scheme_name": "Kisan Credit Card (KCC)",
+        "category": "Agriculture",
+        "eligibility": "Farmers, individual/joint borrowers who are owner cultivators, tenant farmers, self-help groups.",
+        "benefits": "Short-term credit limits for crop production, post-harvest expenses, consumption requirements.",
+        "required_documents": ["Aadhar Card", "PAN/Voter ID", "Land documents", "Recent Passport Size Photograph"],
+        "ministry": "Ministry of Agriculture and Farmers Welfare"
+    },
+    {
+        "id": 9,
+        "scheme_name": "PM Street Vendor's AtmaNirbhar Nidhi (PM SVANidhi)",
+        "category": "Business",
+        "eligibility": "Street vendors vending before March 24, 2020, with certificate of vending/identity card.",
+        "benefits": "Collateral-free working capital loan of up to ₹10,000 with 7% interest subsidy.",
+        "required_documents": ["Aadhar Card", "Voter ID", "Certificate of Vending"],
+        "ministry": "Ministry of Housing and Urban Affairs"
+    },
+    {
+        "id": 10,
+        "scheme_name": "Atal Pension Yojana (APY)",
+        "category": "Pension",
+        "eligibility": "Citizens of India between 18-40 years of age with a savings bank account.",
+        "benefits": "Guaranteed minimum monthly pension between ₹1,000 and ₹5,000 after the age of 60.",
+        "required_documents": ["Aadhar Card", "Savings Bank Account"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 11,
+        "scheme_name": "Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY)",
+        "category": "Insurance",
+        "eligibility": "Citizens between 18 and 50 years of age with a bank account.",
+        "benefits": "Life cover of ₹2 lakh for a premium of ₹436 per annum.",
+        "required_documents": ["Aadhar Card", "Bank Passbook"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 12,
+        "scheme_name": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+        "category": "Insurance",
+        "eligibility": "Citizens between 18 and 70 years of age with a bank account.",
+        "benefits": "Accident insurance cover of ₹2 lakh for death/disability for a premium of ₹20 per annum.",
+        "required_documents": ["Aadhar Card", "Bank Passbook"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 13,
+        "scheme_name": "National Social Assistance Programme (NSAP) - IGNOAPS",
+        "category": "Pension",
+        "eligibility": "BPL citizens aged 60 years or older.",
+        "benefits": "Monthly pension of ₹200 (₹500 for age >80). State govts may add more.",
+        "required_documents": ["Aadhar Card", "Age Proof", "BPL Certificate"],
+        "ministry": "Ministry of Rural Development"
+    },
+    {
+        "id": 14,
+        "scheme_name": "Beti Bachao Beti Padhao (BBBP)",
+        "category": "Women & Child",
+        "eligibility": "Families with girl children.",
+        "benefits": "Welfare services focused on survival, protection, and education of girl child (no direct DBT).",
+        "required_documents": ["Aadhar Card", "Birth Certificate of Child"],
+        "ministry": "Ministry of Women and Child Development"
+    },
+    {
+        "id": 15,
+        "scheme_name": "Sukanya Samriddhi Yojana (SSY)",
+        "category": "Finance",
+        "eligibility": "Parents or legal guardians of a girl child below 10 years of age.",
+        "benefits": "High-interest savings account for girl child's education and marriage expenses (tax benefits under 80C).",
+        "required_documents": ["Birth Certificate of Girl Child", "Aadhar of Parent", "PAN of Parent"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 16,
+        "scheme_name": "Pradhan Mantri Kaushal Vikas Yojana (PMKVY)",
+        "category": "Education",
+        "eligibility": "Indian youth (school/college dropouts or unemployed).",
+        "benefits": "Free skill training, certification, and placement assistance.",
+        "required_documents": ["Aadhar Card", "Bank Passbook", "Passport Size Photograph"],
+        "ministry": "Ministry of Skill Development and Entrepreneurship"
+    },
+    {
+        "id": 17,
+        "scheme_name": "Deen Dayal Upadhyaya Grameen Kaushalya Yojana (DDU-GKY)",
+        "category": "Education",
+        "eligibility": "Rural youth between 15 and 35 years of age from poor families.",
+        "benefits": "Placement-linked skill training.",
+        "required_documents": ["Aadhar Card", "BPL Ration Card or SECC inclusion details"],
+        "ministry": "Ministry of Rural Development"
+    },
+    {
+        "id": 18,
+        "scheme_name": "Stand Up India Scheme",
+        "category": "Business",
+        "eligibility": "SC/ST and/or women entrepreneurs above 18 years for setting up a greenfield enterprise.",
+        "benefits": "Bank loans between ₹10 lakh and ₹1 crore.",
+        "required_documents": ["Aadhar Card", "PAN Card", "Caste Certificate (if applicable)", "Project Report"],
+        "ministry": "Ministry of Finance"
+    },
+    {
+        "id": 19,
+        "scheme_name": "Prime Minister's Employment Generation Programme (PMEGP)",
+        "category": "Business",
+        "eligibility": "Any individual above 18 years of age. At least VIII standard pass for projects costing above ₹10 lakh in manufacturing.",
+        "benefits": "Credit-linked subsidy for setting up new micro-enterprises.",
+        "required_documents": ["Aadhar Card", "Project Report", "Education/Skill Certificate if applicable"],
+        "ministry": "Ministry of Micro, Small and Medium Enterprises"
+    },
+    {
+        "id": 20,
+        "scheme_name": "Pradhan Mantri Fasal Bima Yojana (PMFBY)",
+        "category": "Agriculture",
+        "eligibility": "All farmers growing notified crops in a notified area, including sharecroppers and tenant farmers.",
+        "benefits": "Comprehensive insurance cover against failure of crops due to non-preventable natural risks.",
+        "required_documents": ["Aadhar Card", "Land Ownership Document", "Sowing Certificate", "Bank Passbook"],
+        "ministry": "Ministry of Agriculture and Farmers Welfare"
+    }
+]
