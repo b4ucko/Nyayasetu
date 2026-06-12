@@ -31,22 +31,65 @@ class AIRateLimiter:
 api_limiter = AIRateLimiter(max_rpm=100)
 
 # --- GEMINI CLIENT CONFIGURATION ---
-# The Gemini API Key is loaded dynamically from the environment.
-# TO ENTER YOUR API KEY:
-# 1. Create a '.env' file in the 'backend/' directory (or copy '.env.template' to '.env').
-# 2. Add: GEMINI_API_KEY=your_actual_gemini_api_key_here
-gemini_api_key = os.getenv("GEMINI_API_KEY")
+# Load up to 10 sequential API keys from environment variables (GEMINI_API_KEY_1 to GEMINI_API_KEY_10)
+FREE_KEYS = []
+for i in range(1, 11):
+    key = os.getenv(f"GEMINI_API_KEY_{i}")
+    if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
+        FREE_KEYS.append(key.strip())
 
-if not gemini_api_key or gemini_api_key == "your_gemini_api_key_here":
-    print("Warning: GEMINI_API_KEY is missing or using default placeholder. Please set it in backend/.env")
-    gemini_api_key = None
+# Fallback to the default single GEMINI_API_KEY if no sequential keys were set
+default_key = os.getenv("GEMINI_API_KEY")
+if default_key and default_key.strip() and default_key != "your_gemini_api_key_here":
+    if default_key.strip() not in FREE_KEYS:
+        FREE_KEYS.append(default_key.strip())
 
-try:
-    # Initialize the Single Master Client (Round-Robin structure removed)
-    client = genai.Client(api_key=gemini_api_key) if gemini_api_key else None
-except Exception as e:
-    print(f"Error initializing Gemini client: {e}")
-    client = None
+class RotatingModels:
+    def __init__(self, parent):
+        self.parent = parent
+
+    async def generate_content(self, *args, **kwargs):
+        clients_to_try = self.parent.clients if self.parent.clients else [genai.Client()]
+        last_error = None
+        
+        for _ in range(len(clients_to_try)):
+            idx = self.parent.current_index
+            current_client = clients_to_try[idx]
+            
+            # Rotate index to next client
+            if self.parent.clients:
+                self.parent.current_index = (idx + 1) % len(self.parent.clients)
+                
+            try:
+                return await current_client.aio.models.generate_content(*args, **kwargs)
+            except Exception as e:
+                print(f"Key Rotation Failover: Key at index {idx} failed with error: {str(e)}. Trying next key...")
+                last_error = e
+                continue
+                
+        raise last_error
+
+class RotatingAio:
+    def __init__(self, parent):
+        self.models = RotatingModels(parent)
+
+class RoundRobinClient:
+    def __init__(self, keys):
+        self.clients = []
+        self.current_index = 0
+        for key in keys:
+            try:
+                self.clients.append(genai.Client(api_key=key))
+            except Exception as e:
+                print(f"Warning: Failed to load a Gemini Key: {e}")
+        
+        self.aio = RotatingAio(self)
+
+    def __bool__(self):
+        return len(self.clients) > 0 or os.getenv("GEMINI_API_KEY") is not None
+
+# Initialize Master Rotating Client
+client = RoundRobinClient(FREE_KEYS)
 
 # For backwards compatibility and design separation, we alias all clients to the same master client
 guides_client = client
