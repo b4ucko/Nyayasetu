@@ -10,7 +10,16 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "../datasets/dataset.json")
 
 class GeminiEmbeddings(Embeddings):
     def __init__(self):
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = None
+        for i in range(1, 11):
+            key = os.environ.get(f"GEMINI_API_KEY_{i}")
+            if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
+                api_key = key.strip()
+                break
+                
+        if not api_key:
+            api_key = os.environ.get("GEMINI_API_KEY")
+            
         if not api_key or api_key == "your_gemini_api_key_here":
             # Try loading from backend/.env as fallback for local dev
             try:
@@ -18,7 +27,15 @@ class GeminiEmbeddings(Embeddings):
                 env_path = os.path.join(os.path.dirname(__file__), "../backend/.env")
                 if os.path.exists(env_path):
                     load_dotenv(env_path)
-                    api_key = os.environ.get("GEMINI_API_KEY")
+                    
+                    # Try sequential keys again
+                    for i in range(1, 11):
+                        key = os.environ.get(f"GEMINI_API_KEY_{i}")
+                        if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
+                            api_key = key.strip()
+                            break
+                    if not api_key:
+                        api_key = os.environ.get("GEMINI_API_KEY")
             except ImportError:
                 pass
         
