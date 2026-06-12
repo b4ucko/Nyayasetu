@@ -26,7 +26,7 @@ class GeminiEmbeddings(Embeddings):
             print("Warning: GEMINI_API_KEY is missing or using placeholder in GeminiEmbeddings!")
             
         self.client = genai.Client(api_key=api_key if api_key != "your_gemini_api_key_here" else None)
-        self.model = "text-embedding-004"
+        self.model = "gemini-embedding-001"
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:
