@@ -131,6 +131,15 @@ class RecommendationSchema(BaseModel):
 class RecommendationsList(BaseModel):
     schemes: list[RecommendationSchema]
 
+class NoticeAnalysisSchema(BaseModel):
+    notice_type: str
+    sender: str
+    recipient: str
+    key_dates: str
+    summary: str
+    required_action: str
+    severity: str
+
 
 # -----------------------------------------------------
 # Routes
@@ -535,27 +544,35 @@ async def analyze_notice(file: UploadFile = File(...)):
     
     try:
         file_bytes = await file.read()
-        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=file.content_type)
+        
+        # Defensive MIME type resolution
+        mime_type = file.content_type
+        if not mime_type or mime_type == "application/octet-stream":
+            import mimetypes
+            guessed_type, _ = mimetypes.guess_type(file.filename or "")
+            mime_type = guessed_type or "image/jpeg"
+            
+        supported_types = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"]
+        if mime_type not in supported_types:
+            if file.filename and file.filename.lower().endswith(".pdf"):
+                mime_type = "application/pdf"
+            else:
+                mime_type = "image/jpeg"
+                
+        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
         
         prompt = """
         You are an expert Indian Legal Aid AI. Analyze this uploaded legal or official notice.
-        Return a exact JSON object where ALL VALUES MUST BE STRINGS. Do NOT use arrays or nested objects.
-        {
-          "notice_type": "What kind of notice is this? (e.g., Tax Notice, Traffic Challan, Bank Default)",
-          "sender": "Who sent it exactly? (Authority/Person name)",
-          "recipient": "Who is it addressed to?",
-          "key_dates": "Any deadlines, hearing dates, or issue dates found (comma separated if multiple)",
-          "summary": "A brief, plain-English summary of what the notice actually means.",
-          "required_action": "What must the user do next?",
-          "severity": "Low, Medium, or High"
-        }
+        Extract the values matching the requested schema.
         """
+        
         response = await scanner_client.aio.models.generate_content(
             model='gemini-2.5-flash',
             contents=[prompt, doc_part],
             config=types.GenerateContentConfig(
                 temperature=0.1,
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=NoticeAnalysisSchema
             ),
         )
         return {"analysis": response.text}
