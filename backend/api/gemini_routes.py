@@ -31,18 +31,30 @@ class AIRateLimiter:
 api_limiter = AIRateLimiter(max_rpm=100)
 
 # --- GEMINI CLIENT CONFIGURATION ---
-# Load up to 10 sequential API keys from environment variables (GEMINI_API_KEY_1 to GEMINI_API_KEY_10)
+# Load up to 10 sequential API keys from environment variables
 FREE_KEYS = []
 for i in range(1, 11):
-    key = os.getenv(f"GEMINI_API_KEY_{i}")
-    if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
-        FREE_KEYS.append(key.strip())
+    # Support multiple naming patterns (GEMINI_SECRET_KEY1, GEMINI_SECRET_KEY_1, GEMINI_API_KEY_1, GEMINI_API_KEY1)
+    keys_to_try = [
+        os.getenv(f"GEMINI_SECRET_KEY{i}"),
+        os.getenv(f"GEMINI_SECRET_KEY_{i}"),
+        os.getenv(f"GEMINI_API_KEY_{i}"),
+        os.getenv(f"GEMINI_API_KEY{i}")
+    ]
+    for key in keys_to_try:
+        if key and key.strip() and not key.startswith("your_gemini_"):
+            val = key.strip()
+            if val not in FREE_KEYS:
+                FREE_KEYS.append(val)
+            break
 
-# Fallback to the default single GEMINI_API_KEY if no sequential keys were set
-default_key = os.getenv("GEMINI_API_KEY")
-if default_key and default_key.strip() and default_key != "your_gemini_api_key_here":
-    if default_key.strip() not in FREE_KEYS:
-        FREE_KEYS.append(default_key.strip())
+# Fallback to the default single GEMINI_API_KEY or GEMINI_SECRET_KEY if no sequential keys were set
+for default_env_var in ["GEMINI_API_KEY", "GEMINI_SECRET_KEY"]:
+    default_key = os.getenv(default_env_var)
+    if default_key and default_key.strip() and not default_key.startswith("your_gemini_"):
+        if default_key.strip() not in FREE_KEYS:
+            FREE_KEYS.append(default_key.strip())
+
 
 class RotatingModels:
     def __init__(self, parent):
@@ -86,7 +98,7 @@ class RoundRobinClient:
         self.aio = RotatingAio(self)
 
     def __bool__(self):
-        return len(self.clients) > 0 or os.getenv("GEMINI_API_KEY") is not None
+        return len(self.clients) > 0 or os.getenv("GEMINI_API_KEY") is not None or os.getenv("GEMINI_SECRET_KEY") is not None
 
 # Initialize Master Rotating Client
 client = RoundRobinClient(FREE_KEYS)

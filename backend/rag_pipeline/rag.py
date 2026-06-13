@@ -10,32 +10,28 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "../datasets/dataset.json")
 
 class GeminiEmbeddings(Embeddings):
     def __init__(self):
-        api_key = None
-        for i in range(1, 11):
-            key = os.environ.get(f"GEMINI_API_KEY_{i}")
-            if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
-                api_key = key.strip()
-                break
-                
-        if not api_key:
-            api_key = os.environ.get("GEMINI_API_KEY")
+        def find_first_key():
+            for i in range(1, 11):
+                for key_name in [f"GEMINI_SECRET_KEY{i}", f"GEMINI_SECRET_KEY_{i}", f"GEMINI_API_KEY_{i}", f"GEMINI_API_KEY{i}"]:
+                    key = os.environ.get(key_name)
+                    if key and key.strip() and not key.startswith("your_gemini_"):
+                        return key.strip()
+            for key_name in ["GEMINI_API_KEY", "GEMINI_SECRET_KEY"]:
+                key = os.environ.get(key_name)
+                if key and key.strip() and not key.startswith("your_gemini_"):
+                    return key.strip()
+            return None
+
+        api_key = find_first_key()
             
-        if not api_key or api_key == "your_gemini_api_key_here":
+        if not api_key:
             # Try loading from backend/.env as fallback for local dev
             try:
                 from dotenv import load_dotenv
                 env_path = os.path.join(os.path.dirname(__file__), "../backend/.env")
                 if os.path.exists(env_path):
                     load_dotenv(env_path)
-                    
-                    # Try sequential keys again
-                    for i in range(1, 11):
-                        key = os.environ.get(f"GEMINI_API_KEY_{i}")
-                        if key and key.strip() and key != f"your_gemini_api_key_{i}_here":
-                            api_key = key.strip()
-                            break
-                    if not api_key:
-                        api_key = os.environ.get("GEMINI_API_KEY")
+                    api_key = find_first_key()
             except ImportError:
                 pass
         
