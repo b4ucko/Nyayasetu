@@ -8,7 +8,8 @@ import axios from 'axios'
 axios.interceptors.request.use((config) => {
   const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
   if (isProd && config.url && config.url.startsWith('http://localhost:8000')) {
-    config.url = config.url.replace('http://localhost:8000', `${window.location.origin}/_/backend`);
+    const backendUrl = import.meta.env.VITE_API_URL || 'https://nyayasetu-backend-akaf.onrender.com';
+    config.url = config.url.replace('http://localhost:8000', backendUrl);
   }
   return config;
 }, (error) => {
