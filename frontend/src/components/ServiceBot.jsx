@@ -696,9 +696,7 @@ If you need any other help, type "menu" to choose another option.`;
       {/* Header */}
       <div className="bg-gradient-to-r from-govblue to-blue-600 p-4 flex justify-between items-center shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border border-white/30">
-            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-full" />
-          </div>
+          <img src="/logo.png" alt="Omni-Gov Logo" className="w-12 h-12 object-contain" />
           <div>
             <h3 className="font-bold text-white text-lg leading-tight">Omni-Gov Assistant</h3>
             <p className="text-blue-100 text-xs flex items-center mt-0.5">
