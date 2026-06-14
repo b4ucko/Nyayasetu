@@ -114,7 +114,7 @@ function Navigation({ theme, toggleTheme }) {
     <nav className="glass-nav sticky top-0 z-50 transition-all duration-300">
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
         <Link to="/" className="flex items-center space-x-3 group">
-          <img src="/logo.png" alt="Nyayasetu Logo" className="w-12 h-12 object-contain transform transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300" />
+          <img src="/logo.png" alt="Nyayasetu Logo" className="w-8 h-8 object-contain transform transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300" />
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight transition-colors">
             Nyayasetu <span className="bg-gradient-to-r from-govblue to-govorange text-gradient">Advocate</span>
           </h1>

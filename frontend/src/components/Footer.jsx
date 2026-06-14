@@ -14,7 +14,7 @@ function Footer() {
           {/* Column 1: Brand & About */}
           <div className="col-span-1 md:col-span-1 lg:col-span-2">
             <Link to="/" className="flex items-center space-x-3 group inline-block mb-6">
-              <img src="/logo.png" alt="Omni-Gov Logo" className="w-12 h-12 object-contain transform transition-transform hover:-translate-y-1 hover:rotate-6 duration-300" />
+              <img src="/logo.png" alt="Omni-Gov Logo" className="w-8 h-8 object-contain transform transition-transform hover:-translate-y-1 hover:rotate-6 duration-300" />
               <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">
                 Omni-Gov <span className="bg-gradient-to-r from-govblue to-govorange text-transparent bg-clip-text">Advocate</span>
               </h2>
