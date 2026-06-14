@@ -15,7 +15,7 @@ function Footer() {
           <div className="col-span-1 md:col-span-1 lg:col-span-2">
             <Link to="/" className="flex items-center space-x-3 group inline-block mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-govblue to-govorange rounded-xl flex items-center justify-center text-white shadow-lg transform transition-transform hover:-translate-y-1 hover:shadow-xl hover:rotate-6 duration-300">
-                <span className="text-xl">🇮🇳</span>
+                <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-lg" />
               </div>
               <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">
                 Omni-Gov <span className="bg-gradient-to-r from-govblue to-govorange text-transparent bg-clip-text">Advocate</span>

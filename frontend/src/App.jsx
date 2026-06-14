@@ -115,7 +115,7 @@ function Navigation({ theme, toggleTheme }) {
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
         <Link to="/" className="flex items-center space-x-3 group">
           <div className="w-10 h-10 bg-gradient-to-br from-govblue to-govorange rounded-xl flex items-center justify-center text-white shadow-lg transform transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300">
-            <span className="text-xl">🇮🇳</span>
+            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-lg" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight transition-colors">
             Nyayasetu <span className="bg-gradient-to-r from-govblue to-govorange text-gradient">Advocate</span>
