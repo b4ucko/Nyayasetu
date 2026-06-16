@@ -18,7 +18,7 @@ export default function Terms() {
         <Info className="w-6 h-6 text-govorange shrink-0 mt-1" />
         <div>
           <h4 className="font-bold text-slate-900 dark:text-white mb-1">Important Disclaimer</h4>
-          <p className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed font-medium">
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
             Nyayasetu Advocate is an AI-powered assistant designed to find schemes, verify documents, and parse legal notices. It is NOT a substitute for professional legal advice or official government services.
           </p>
         </div>
