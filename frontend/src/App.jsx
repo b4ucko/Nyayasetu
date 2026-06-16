@@ -79,6 +79,7 @@ import HelpCenter from './components/HelpCenter';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import Accessibility from './components/Accessibility';
+import ScrollToTop from './components/ScrollToTop';
 
 function Navigation({ theme, toggleTheme }) {
   const { user, logout } = useAuth();
@@ -195,6 +196,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <ScrollToTop />
         <ScrollObserver setFooterOffset={setFooterOffset} />
         <div className="min-h-screen flex flex-col relative overflow-hidden">
           <CursorGlow />
