@@ -686,7 +686,6 @@ If you need any other help, type "menu" to choose another option.`;
 
   return (
     <div 
-      style={{ transform: isMaximized ? 'none' : `translateY(-${offset}px)` }}
       className={`fixed transition-transform duration-200 animate-fade-in-up flex flex-col overflow-hidden bg-white dark:bg-slate-900 shadow-2xl ${
       isMaximized 
         ? "inset-0 rounded-none z-[100] border-none max-h-none"
