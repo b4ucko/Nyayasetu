@@ -74,6 +74,12 @@ import DigilockerCallback from './components/DigilockerCallback';
 import CursorGlow from './components/CursorGlow';
 import Footer from './components/Footer';
 
+// Public legal/help pages
+import HelpCenter from './components/HelpCenter';
+import Privacy from './components/Privacy';
+import Terms from './components/Terms';
+import Accessibility from './components/Accessibility';
+
 function Navigation({ theme, toggleTheme }) {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -217,6 +223,12 @@ function App() {
 
               {/* Legacy fallback route */}
               <Route path="/profile" element={<ProfileForm setUserProfile={setUserProfile} setRecommendedSchemes={setRecommendedSchemes} />} />
+
+              {/* Public Support & Info Routes */}
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/accessibility" element={<Accessibility />} />
             </Routes>
           </main>
 

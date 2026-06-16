@@ -88,7 +88,12 @@ function Footer() {
           <div className="flex items-center text-sm font-medium text-slate-500 dark:text-slate-400">
             &copy; {new Date().getFullYear()} Omni-Gov Advocate. All rights reserved.
           </div>
-
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+            <Link to="/help-center" className="hover:text-govblue dark:hover:text-blue-400 transition-colors duration-200">Help Center</Link>
+            <Link to="/privacy" className="hover:text-govblue dark:hover:text-blue-400 transition-colors duration-200">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-govblue dark:hover:text-blue-400 transition-colors duration-200">Terms of Service</Link>
+            <Link to="/accessibility" className="hover:text-govblue dark:hover:text-blue-400 transition-colors duration-200">Accessibility</Link>
+          </div>
         </div>
       </div>
     </footer>
