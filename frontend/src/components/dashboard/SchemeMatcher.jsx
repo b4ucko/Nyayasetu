@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../supabase';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const SCHEME_PHASES = [
   { at: 0, label: "Extracting profile facts..." },
@@ -151,16 +152,30 @@ export default function SchemeMatcher() {
 
   return (
     <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl max-w-5xl mx-auto border border-white dark:border-slate-700 transition-colors text-left">
-      {loading ? (
-        <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
-          <ProgressiveFluxLoader 
-            value={progress}
-            phases={SCHEME_PHASES} 
-            onComplete={() => setAnimationDone(true)}
-          />
-        </div>
-      ) : (
-        <>
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-855 rounded-2xl flex flex-col items-center justify-center shadow-inner my-4 w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={progress}
+              phases={SCHEME_PHASES} 
+              onComplete={() => setAnimationDone(true)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full space-y-4"
+          >
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
               <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight transition-colors">AI Scheme Matcher</h2>
@@ -237,8 +252,9 @@ export default function SchemeMatcher() {
               </div>
             )}
           </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

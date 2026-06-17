@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { UploadCloud, MessageSquare, AlertTriangle, FileText, Send, User, Bot, AlertCircle } from 'lucide-react';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const NOTICE_PHASES = [
   { at: 0, label: "uploading document..." },
@@ -165,16 +166,30 @@ export default function NoticeChecker() {
 
   return (
     <div className="p-4 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-4 border border-white dark:border-slate-700 transition-colors text-left">
-      {analysisLoading ? (
-        <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
-          <ProgressiveFluxLoader 
-            value={progress}
-            phases={NOTICE_PHASES} 
-            onComplete={() => setAnimationDone(true)} 
-          />
-        </div>
-      ) : (
-        <>
+      <AnimatePresence mode="wait">
+        {analysisLoading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner my-4 w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={progress}
+              phases={NOTICE_PHASES} 
+              onComplete={() => setAnimationDone(true)} 
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full space-y-4"
+          >
           <div className="flex items-center space-x-3 mb-1">
             <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-xl border border-red-200 dark:border-red-800">
               <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -308,8 +323,9 @@ export default function NoticeChecker() {
               </div>
             </div>
           )}
-        </>
+        </motion.div>
       )}
-    </div>
+    </AnimatePresence>
+  </div>
   );
 }

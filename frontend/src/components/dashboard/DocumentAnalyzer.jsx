@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const OCR_PHASES = [
   { at: 0, label: "sending file to vision model..." },
@@ -175,24 +176,45 @@ export default function DocumentAnalyzer() {
 
   return (
     <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-6 border border-white dark:border-slate-700 transition-colors text-left">
-      {loading ? (
-        <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
-          <ProgressiveFluxLoader 
-            value={ocrProgress}
-            phases={OCR_PHASES} 
-            onComplete={() => setAnimationDone(true)}
-          />
-        </div>
-      ) : loadingFraud ? (
-        <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
-          <ProgressiveFluxLoader 
-            value={fraudProgress}
-            phases={FRAUD_PHASES} 
-            onComplete={() => setFraudAnimationDone(true)}
-          />
-        </div>
-      ) : (
-        <>
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div
+            key="ocr-loading"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner my-4 w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={ocrProgress}
+              phases={OCR_PHASES} 
+              onComplete={() => setAnimationDone(true)}
+            />
+          </motion.div>
+        ) : loadingFraud ? (
+          <motion.div
+            key="fraud-loading"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-855 rounded-2xl flex flex-col items-center justify-center shadow-inner my-4 w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={fraudProgress}
+              phases={FRAUD_PHASES} 
+              onComplete={() => setFraudAnimationDone(true)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full space-y-6"
+          >
           <div>
             <h2 className="text-2xl font-bold mb-2 text-slate-800 dark:text-white transition-colors">Document AI (OCR)</h2>
             <p className="text-slate-605 dark:text-slate-400 transition-colors">Upload documents (e.g. Aadhaar, Pan) to extract structured citizen data securely.</p>
@@ -380,8 +402,9 @@ export default function DocumentAnalyzer() {
               })()}
             </div>
           )}
-        </>
+        </motion.div>
       )}
-    </div>
+    </AnimatePresence>
+  </div>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { UserCircle, Briefcase, IndianRupee, MapPin, Map, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building } from 'lucide-react';
 import { ProgressiveFluxLoader } from './ui/progressive-flux-loader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const EXTRACT_PHASES = [
   { at: 0, label: "uploading id card image..." },
@@ -180,24 +181,45 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
 
   return (
     <div className="max-w-3xl mx-auto my-12 text-left animate-fade-in">
-      {loading ? (
-        <div className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px]">
-          <ProgressiveFluxLoader 
-            value={progress}
-            phases={SCHEME_PHASES} 
-            onComplete={() => setLoadingDone(true)}
-          />
-        </div>
-      ) : extracting ? (
-        <div className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px]">
-          <ProgressiveFluxLoader 
-            value={extractProgress}
-            phases={EXTRACT_PHASES} 
-            onComplete={() => setExtractingDone(true)}
-          />
-        </div>
-      ) : (
-        <>
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px] w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={progress}
+              phases={SCHEME_PHASES} 
+              onComplete={() => setLoadingDone(true)}
+            />
+          </motion.div>
+        ) : extracting ? (
+          <motion.div
+            key="extracting"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px] w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={extractProgress}
+              phases={EXTRACT_PHASES} 
+              onComplete={() => setExtractingDone(true)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full"
+          >
           <div className="text-center mb-10">
             <h2 className="text-4xl font-extrabold text-slate-800 mb-4 animate-fade-in">Tell us about yourself</h2>
             <p className="text-slate-650 text-lg">Our AI agents use this profile to scan hundreds of policies instantly.</p>
@@ -353,8 +375,9 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
               </button>
             </form>
           </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

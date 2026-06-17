@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { AlertCircle, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building, UserCircle } from 'lucide-react';
 import axios from 'axios';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const EXTRACT_PHASES = [
   { at: 0, label: "uploading id card image..." },
@@ -257,16 +258,30 @@ export default function ProfileBuilder() {
 
   return (
     <div className="p-6 glass dark:bg-slate-800/80 rounded-2xl shadow-xl w-full max-w-5xl mx-auto border dark:border-slate-700 transition-colors">
-      {extracting ? (
-        <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-855 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4 min-h-[350px]">
-          <ProgressiveFluxLoader 
-            value={extractProgress}
-            phases={EXTRACT_PHASES} 
-            onComplete={() => setExtractingDone(true)}
-          />
-        </div>
-      ) : (
-        <>
+      <AnimatePresence mode="wait">
+        {extracting ? (
+          <motion.div
+            key="extracting"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-855 rounded-2xl flex flex-col items-center justify-center shadow-inner my-4 min-h-[350px] w-full"
+          >
+            <ProgressiveFluxLoader 
+              value={extractProgress}
+              phases={EXTRACT_PHASES} 
+              onComplete={() => setExtractingDone(true)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full"
+          >
           <h2 className="text-2xl font-bold mb-4 text-slate-800 dark:text-white transition-colors">Citizen Profile Builder</h2>
           <p className="text-slate-650 dark:text-slate-300 mb-6 transition-colors">Build your profile to get personalized scheme recommendations securely.</p>
           
@@ -599,8 +614,9 @@ export default function ProfileBuilder() {
               </div>
             )}
           </form>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
