@@ -3,6 +3,15 @@ import { supabase } from '../../supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { AlertCircle, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building, UserCircle } from 'lucide-react';
 import axios from 'axios';
+import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+
+const EXTRACT_PHASES = [
+  { at: 0, label: "uploading id card image..." },
+  { at: 20, label: "scanning layout & border detection..." },
+  { at: 50, label: "extracting text & masking numbers..." },
+  { at: 80, label: "validating profile details..." },
+  { at: 98, label: "applying autofill..." },
+];
 
 export default function ProfileBuilder() {
   const { user } = useAuth();
@@ -279,6 +288,75 @@ export default function ProfileBuilder() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
+        {isEditing && (
+          <div className="bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl mb-4 text-left">
+            <h3 className="text-base font-bold text-slate-800 dark:text-white mb-3 flex items-center">
+              <FileUp className="w-5 h-5 mr-2 text-slate-650" /> Fast-Track Profile Autofill (Optional)
+            </h3>
+            <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${extracting ? 'border-govblue bg-blue-50/50' : 'border-slate-350 dark:border-slate-700 hover:bg-slate-50/50'}`}>
+              {extracting ? (
+                <div className="py-4">
+                  <ProgressiveFluxLoader phases={EXTRACT_PHASES} duration={8} />
+                </div>
+              ) : (
+                <>
+                  <input 
+                    type="file" 
+                    onChange={handleFileUpload}
+                    accept="image/*,.pdf"
+                    className="block w-full text-sm text-slate-550 file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-govblue/10 file:text-govblue hover:file:bg-govblue/20 cursor-pointer" 
+                  />
+                  <p className="text-xs text-slate-500 mt-3 font-medium">Upload Aadhaar or Certified ID for instant OCR Profile Extraction.</p>
+                </>
+              )}
+            </div>
+
+            {/* Verified ID Details Card */}
+            {verifiedIdDetails && (
+              <div className="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-sm relative overflow-hidden animate-fade-in-up">
+                <div className="absolute top-0 right-0 p-4">
+                  <ShieldCheck className="w-16 h-16 text-green-200 opacity-40 transform rotate-12" />
+                </div>
+                <div className="flex items-center space-x-3 mb-4 relative z-10">
+                  <div className="bg-green-100 p-2 rounded-full shadow-inner border border-green-200">
+                    <ShieldCheck className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h4 className="text-xl font-bold text-green-800 tracking-tight">Verified ID Details</h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-705 relative z-10">
+                  <div className="flex items-start bg-white/60 p-3 rounded-lg border border-green-100/50">
+                    <CreditCard className="w-5 h-5 mr-3 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold block text-green-800 text-xs uppercase tracking-wider mb-0.5">{verifiedIdDetails.id_type}</span>
+                      <span className="font-mono text-slate-800">{verifiedIdDetails.id_number_masked}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start bg-white/60 p-3 rounded-lg border border-green-100/50">
+                    <UserCircle className="w-5 h-5 mr-3 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold block text-green-800 text-xs uppercase tracking-wider mb-0.5">Name</span>
+                      <span className="text-slate-800 font-medium">{verifiedIdDetails.name || 'Not Available'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start bg-white/60 p-3 rounded-lg border border-green-100/50">
+                    <Calendar className="w-5 h-5 mr-3 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold block text-green-800 text-xs uppercase tracking-wider mb-0.5">Date of Birth</span>
+                      <span className="text-slate-800 font-medium">{verifiedIdDetails.dob || 'Not Available'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start bg-white/60 p-3 rounded-lg border border-green-100/50">
+                    <Building className="w-5 h-5 mr-3 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold block text-green-800 text-xs uppercase tracking-wider mb-0.5">Address</span>
+                      <span className="text-slate-800 font-medium">{verifiedIdDetails.full_address || 'Not Available'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 transition-colors">Age</label>

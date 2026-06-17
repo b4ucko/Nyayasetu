@@ -1,6 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { UploadCloud, MessageSquare, AlertTriangle, FileText, Send, User, Bot, AlertCircle } from 'lucide-react';
+import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+
+const NOTICE_PHASES = [
+  { at: 0, label: "uploading document..." },
+  { at: 20, label: "scanning layout & text..." },
+  { at: 45, label: "analyzing legal jargon..." },
+  { at: 75, label: "evaluating options & risks..." },
+  { at: 95, label: "summarizing required actions..." },
+];
 
 const ExpandableText = ({ text, className }) => {
   const [expanded, setExpanded] = useState(false);
@@ -113,7 +122,7 @@ export default function NoticeChecker() {
   };
 
   return (
-    <div className="p-4 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-4 border border-white dark:border-slate-700 transition-colors">
+    <div className="p-4 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-4 border border-white dark:border-slate-700 transition-colors text-left">
       <div className="flex items-center space-x-3 mb-1">
         <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-xl border border-red-200 dark:border-red-800">
           <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -143,6 +152,12 @@ export default function NoticeChecker() {
           </button>
         </div>
       </form>
+
+      {analysisLoading && (
+        <div className="py-12 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in">
+          <ProgressiveFluxLoader phases={NOTICE_PHASES} duration={12} />
+        </div>
+      )}
 
       {analysisError && (
         <div className="bg-red-50 border border-red-200 p-6 rounded-2xl flex items-start space-x-4 shadow-sm dark:bg-red-900/20 dark:border-red-800">

@@ -3,6 +3,15 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../supabase';
+import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+
+const SCHEME_PHASES = [
+  { at: 0, label: "Extracting profile facts..." },
+  { at: 20, label: "Scanning 300+ active government policies..." },
+  { at: 50, label: "Matching eligibility criteria..." },
+  { at: 75, label: "Calculating final match scores..." },
+  { at: 95, label: "Finalizing your report..." },
+];
 
 export default function SchemeMatcher() {
   const { user } = useAuth();
@@ -129,16 +138,22 @@ export default function SchemeMatcher() {
   }, [schemes, filterState, filterCategory]);
 
   return (
-    <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl max-w-5xl mx-auto border border-white dark:border-slate-700 transition-colors">
+    <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl max-w-5xl mx-auto border border-white dark:border-slate-700 transition-colors text-left">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight transition-colors">AI Scheme Matcher</h2>
-          <p className="text-slate-600 dark:text-slate-400 mt-1 transition-colors">Discover personalized benefits powered by our Glorious AI</p>
+          <p className="text-slate-650 dark:text-slate-400 mt-1 transition-colors">Discover personalized benefits powered by our Glorious AI</p>
         </div>
         <button onClick={matchSchemes} disabled={loading} className="bg-gradient-to-r from-govorange to-orange-500 text-white font-bold px-6 py-3 rounded-xl hover:scale-105 shadow-md shadow-orange-500/30 transition auto disabled:opacity-50">
-          {loading ? loadingText : 'Find Matches'}
+          {loading ? 'Matching...' : 'Find Matches'}
         </button>
       </div>
+
+      {loading && (
+        <div className="py-12 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner mb-8 animate-fade-in">
+          <ProgressiveFluxLoader phases={SCHEME_PHASES} duration={12} />
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 p-4 rounded-xl flex items-center justify-center text-sm font-medium animate-fade-in transition-colors shadow-sm">

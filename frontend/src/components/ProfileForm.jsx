@@ -2,6 +2,23 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { UserCircle, Briefcase, IndianRupee, MapPin, Map, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building } from 'lucide-react';
+import { ProgressiveFluxLoader } from './ui/progressive-flux-loader';
+
+const EXTRACT_PHASES = [
+  { at: 0, label: "uploading id card image..." },
+  { at: 20, label: "scanning layout & border detection..." },
+  { at: 50, label: "extracting text & masking numbers..." },
+  { at: 80, label: "validating profile details..." },
+  { at: 98, label: "applying autofill..." },
+];
+
+const SCHEME_PHASES = [
+  { at: 0, label: "Extracting profile facts..." },
+  { at: 20, label: "Scanning 300+ active government policies..." },
+  { at: 50, label: "Matching eligibility criteria..." },
+  { at: 75, label: "Calculating final match scores..." },
+  { at: 95, label: "Finalizing your report..." },
+];
 
 export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
   const navigate = useNavigate();
@@ -83,11 +100,11 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto my-12">
+    <div className="max-w-3xl mx-auto my-12 text-left">
       
       <div className="text-center mb-10">
         <h2 className="text-4xl font-extrabold text-slate-800 mb-4">Tell us about yourself</h2>
-        <p className="text-slate-600 text-lg">Our AI agents use this profile to scan hundreds of policies instantly.</p>
+        <p className="text-slate-650 text-lg">Our AI agents use this profile to scan hundreds of policies instantly.</p>
       </div>
 
       <div className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden">
@@ -173,13 +190,12 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
 
           <div className="pt-6 border-t border-slate-200/60">
             <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center">
-              <FileUp className="w-5 h-5 mr-2 text-slate-600" /> Fast-Track Upload (Optional)
+              <FileUp className="w-5 h-5 mr-2 text-slate-650" /> Fast-Track Upload (Optional)
             </h3>
-            <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${extracting ? 'border-govblue bg-blue-50' : 'border-slate-300 hover:bg-slate-50/50'}`}>
+            <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${extracting ? 'border-govblue bg-blue-50/50' : 'border-slate-300 hover:bg-slate-50/50'}`}>
               {extracting ? (
-                <div className="flex flex-col items-center justify-center space-y-3 py-4">
-                  <Sparkles className="w-8 h-8 text-govblue animate-pulse" />
-                  <p className="text-sm font-semibold text-govblue">AI Agent is securely extracting your certified ID details...</p>
+                <div className="py-4">
+                  <ProgressiveFluxLoader phases={EXTRACT_PHASES} duration={8} />
                 </div>
               ) : (
                 <>
@@ -187,7 +203,7 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
                     type="file" 
                     onChange={handleFileUpload}
                     accept="image/*,.pdf"
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-govblue/10 file:text-govblue hover:file:bg-govblue/20 cursor-pointer" 
+                    className="block w-full text-sm text-slate-550 file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-govblue/10 file:text-govblue hover:file:bg-govblue/20 cursor-pointer" 
                   />
                   <p className="text-xs text-slate-500 mt-3 font-medium">Upload Aadhaar or Certified ID for instant OCR Profile Extraction.</p>
                 </>
@@ -206,7 +222,7 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
                   </div>
                   <h4 className="text-xl font-bold text-green-800 tracking-tight">Verified ID Details</h4>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-700 relative z-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-705 relative z-10">
                   <div className="flex items-start bg-white/60 p-3 rounded-lg border border-green-100/50">
                     <CreditCard className="w-5 h-5 mr-3 text-green-600 mt-0.5 shrink-0" />
                     <div>
@@ -240,25 +256,19 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
             )}
           </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className={`w-full py-4 px-6 rounded-xl text-white font-bold text-lg shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 ${
-              loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-govblue to-govblue/80 hover:scale-[1.02] hover:shadow-govblue/30'
-            }`}
-          >
-            {loading ? (
-              <>
-                <Sparkles className="animate-pulse w-5 h-5 mr-2" />
-                <span>AI Agents Analyzing Policies...</span>
-              </>
-            ) : (
-              <>
-                <span>Find My Eligible Schemes</span>
-                <Sparkles className="w-5 h-5 ml-2 text-yellow-200" />
-              </>
-            )}
-          </button>
+          {loading ? (
+            <div className="py-6 bg-blue-50/50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in">
+              <ProgressiveFluxLoader phases={SCHEME_PHASES} duration={12} />
+            </div>
+          ) : (
+            <button 
+              type="submit" 
+              className="w-full py-4 px-6 rounded-xl text-white font-bold text-lg shadow-lg transition-all duration-305 flex items-center justify-center space-x-2 bg-gradient-to-r from-govblue to-govblue/80 hover:scale-[1.02] hover:shadow-govblue/30"
+            >
+              <span>Find My Eligible Schemes</span>
+              <Sparkles className="w-5 h-5 ml-2 text-yellow-200" />
+            </button>
+          )}
         </form>
       </div>
     </div>

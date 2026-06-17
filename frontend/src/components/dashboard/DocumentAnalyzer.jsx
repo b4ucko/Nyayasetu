@@ -2,6 +2,23 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
+import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
+
+const OCR_PHASES = [
+  { at: 0, label: "sending file to vision model..." },
+  { at: 20, label: "reading text bytes & layouts..." },
+  { at: 50, label: "extracting names, DOB, addresses..." },
+  { at: 80, label: "masking identifying numbers..." },
+  { at: 95, label: "compiling extracted metadata..." },
+];
+
+const FRAUD_PHASES = [
+  { at: 0, label: "performing secure forensics..." },
+  { at: 20, label: "detecting digital edits & photoshop..." },
+  { at: 50, label: "verifying watermarks & government seals..." },
+  { at: 75, label: "verifying fonts & layout structure..." },
+  { at: 95, label: "evaluating authenticity rating..." },
+];
 
 export default function DocumentAnalyzer() {
   const [file, setFile] = useState(null);
@@ -66,7 +83,7 @@ export default function DocumentAnalyzer() {
   };
 
   return (
-    <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-6 border border-white dark:border-slate-700 transition-colors">
+    <div className="p-6 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-6 border border-white dark:border-slate-700 transition-colors text-left">
       <div>
         <h2 className="text-2xl font-bold mb-2 text-slate-800 dark:text-white transition-colors">Document AI (OCR)</h2>
         <p className="text-slate-600 dark:text-slate-400 transition-colors">Upload documents (e.g. Aadhaar, Pan) to extract structured citizen data securely.</p>
@@ -81,13 +98,25 @@ export default function DocumentAnalyzer() {
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button type="submit" disabled={loading || loadingFraud || !file} className="w-full bg-govblue disabled:bg-slate-400 dark:disabled:bg-slate-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md disabled:opacity-50">
-            {loading ? 'Vision Model Analyzing...' : 'Extract Data'}
+            {loading ? 'Analyzing...' : 'Extract Data'}
           </button>
           <button type="button" onClick={handleFraudCheck} disabled={loadingFraud || loading || !file} className="w-full bg-red-600 disabled:bg-slate-400 dark:disabled:bg-slate-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 transition shadow-md disabled:opacity-50 flex items-center justify-center">
-            {loadingFraud ? 'Scanning for Scams...' : <span className="flex items-center"><AlertCircle className="w-5 h-5 mr-2" /> Detect Fraud / Scam</span>}
+            {loadingFraud ? 'Verifying...' : <span className="flex items-center"><AlertCircle className="w-5 h-5 mr-2" /> Detect Fraud / Scam</span>}
           </button>
         </div>
       </form>
+
+      {loading && (
+        <div className="py-12 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in">
+          <ProgressiveFluxLoader phases={OCR_PHASES} duration={10} />
+        </div>
+      )}
+
+      {loadingFraud && (
+        <div className="py-12 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in">
+          <ProgressiveFluxLoader phases={FRAUD_PHASES} duration={12} />
+        </div>
+      )}
 
       {missingData && (
         <div className="bg-red-50 border border-red-200 p-6 rounded-2xl flex items-start space-x-4 animate-fade-in shadow-sm dark:bg-red-900/20 dark:border-red-800 transition-colors">
