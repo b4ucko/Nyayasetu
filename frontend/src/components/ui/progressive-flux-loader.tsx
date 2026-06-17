@@ -269,7 +269,15 @@ export function ProgressiveFluxLoader({
       let newStartT = currentStartT;
 
       // Can we transition to the next phase?
-      if (nextPhase && elapsed >= currentPhaseDuration && currentTarget >= nextPhase.at) {
+      const isNextLastPhase = (idx + 1) === (currentPhases.length - 1);
+      const targetAllowsLastPhase = !state.isControlled || currentTarget >= 100;
+
+      if (
+        nextPhase &&
+        elapsed >= currentPhaseDuration &&
+        (!isNextLastPhase || targetAllowsLastPhase) &&
+        currentTarget >= nextPhase.at
+      ) {
         newIdx = idx + 1;
         newStartT = now;
         setActivePhaseIndex(newIdx);
