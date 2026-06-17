@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ShieldCheck, Search, Users, ArrowRight, Sparkles, Zap, PhoneCall, FileText, CreditCard, Globe, UserPlus, Car, UserCheck, ShoppingBag, Heart, GraduationCap, Landmark, X, MessageSquare } from 'lucide-react';
+import { ShieldCheck, Search, Users, ArrowRight, Sparkles, Zap, PhoneCall, FileText, CreditCard, Globe, UserPlus, Car, UserCheck, ShoppingBag, Heart, GraduationCap, Landmark, X, MessageSquare, ExternalLink, HelpCircle, BookOpen } from 'lucide-react';
 import ServiceBot from './ServiceBot';
 import { useAuth } from '../hooks/useAuth';
+import { documentGuides } from '../data/documentGuides';
 
 const essentialDocuments = [
   { id: 'aadhaar', name: 'Aadhaar Card', icon: CreditCard, desc: 'A 12-digit unique ID essential for banking, government schemes, tax compliance, and subsidies.' },
@@ -29,33 +30,14 @@ export default function Home({ openBot }) {
   const { user } = useAuth();
 
   const [selectedDoc, setSelectedDoc] = useState(null);
-  const [docGuide, setDocGuide] = useState('');
-  const [loadingGuide, setLoadingGuide] = useState(false);
-  const [loadingText, setLoadingText] = useState('Please wait a moment...');
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const loadingStatements = [
-    "Searching verified official archives...",
-    "Gathering official application procedures...",
-    "Hold on a moment, querying the database...",
-    "Retrieving verified document steps...",
-    "Compiling quick reference guide..."
-  ];
-
-  const handleItemClick = async (item, type = 'document') => {
+  const handleItemClick = (item, type = 'document') => {
     if (type === 'platform' && openBot) {
       openBot({ ...item, type });
     } else if (type === 'document') {
       setSelectedDoc(item);
-      setLoadingText(loadingStatements[Math.floor(Math.random() * loadingStatements.length)]);
-      setLoadingGuide(true);
-      setDocGuide('');
-      try {
-        const res = await axios.get(`http://localhost:8000/api/ai/document-guide/${encodeURIComponent(item.name)}`);
-        setDocGuide(res.data.markdown);
-      } catch (err) {
-        setDocGuide("Failed to fetch document guide. Please ensure the backend is running.");
-      }
-      setLoadingGuide(false);
+      setActiveTab('overview');
     }
   };
 
@@ -412,45 +394,188 @@ export default function Home({ openBot }) {
       </div>
 
     {/* Essential Document Guide Modal */}
-    {selectedDoc && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setSelectedDoc(null)}>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 rounded-t-2xl">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-govblue/10 dark:bg-slate-700 rounded-xl flex items-center justify-center shrink-0">
-                <selectedDoc.icon className="w-6 h-6 text-govorange" />
+    {selectedDoc && (() => {
+      const docData = documentGuides[selectedDoc.id];
+      if (!docData) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in" onClick={() => setSelectedDoc(null)}>
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800/85 overflow-hidden transform transition-all duration-305 scale-100" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-govblue/20 to-indigo-500/20 dark:from-slate-800 dark:to-slate-700/50 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-500/10 shadow-sm">
+                  {React.createElement(selectedDoc.icon, { className: "w-7 h-7 text-govorange" })}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{docData.name} Guide</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold tracking-wide">Nyayasetu Smart Verification System</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{selectedDoc.name} Guide</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Nyayasetu Verification System</p>
-              </div>
+              <button 
+                onClick={() => setSelectedDoc(null)} 
+                className="p-2.5 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 dark:text-slate-400"
+                aria-label="Close modal"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
-            <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-              <X className="w-6 h-6 text-slate-500 dark:text-slate-400" />
-            </button>
-          </div>
-          
-          <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-            {loadingGuide ? (
-              <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                <div className="w-10 h-10 border-4 border-govblue border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-500 font-medium animate-pulse">{loadingText}</p>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-100 dark:border-slate-800 overflow-x-auto custom-scrollbar bg-slate-50/20 dark:bg-slate-900/20">
+              {[
+                { id: 'overview', label: 'Overview & FAQ', icon: BookOpen },
+                { id: 'requirements', label: 'Documents Required', icon: FileText },
+                { id: 'apply', label: 'Steps to Apply', icon: Zap },
+                { id: 'edit', label: 'Update & Correction', icon: ShieldCheck }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 min-w-[150px] py-4 px-4 font-bold text-sm tracking-wide border-b-2 flex items-center justify-center space-x-2.5 transition-all duration-300 ${
+                    activeTab === tab.id
+                      ? 'border-govblue text-govblue dark:border-blue-400 dark:text-blue-400 bg-blue-50/30 dark:bg-slate-800/40'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/10'
+                  }`}
+                >
+                  {React.createElement(tab.icon, { className: "w-4 h-4 shrink-0" })}
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-8 overflow-y-auto flex-1 custom-scrollbar max-h-[55vh] bg-transparent text-left">
+              
+              {/* Overview & FAQ Tab */}
+              {activeTab === 'overview' && (
+                <div className="space-y-8 animate-fade-in text-left">
+                  <div className="bg-gradient-to-r from-govblue/5 to-indigo-500/5 dark:from-slate-850/50 dark:to-slate-800/30 border border-slate-150 dark:border-slate-800/80 p-6 rounded-2xl">
+                    <h4 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">About {docData.name}</h4>
+                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed font-medium">{docData.description}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xl font-extrabold text-slate-850 dark:text-white mb-5 flex items-center">
+                      <HelpCircle className="w-5 h-5 mr-2.5 text-govorange" />
+                      Frequently Asked Questions
+                    </h4>
+                    <div className="grid gap-4">
+                      {docData.faq.map((item, idx) => (
+                        <div key={idx} className="border border-slate-100 dark:border-slate-800/80 rounded-2xl p-5 bg-white dark:bg-slate-900/30 hover:border-govblue/20 dark:hover:border-blue-900/30 transition-all text-left">
+                          <h5 className="font-extrabold text-slate-800 dark:text-slate-100 flex items-start space-x-3 text-base">
+                            <span className="text-govorange dark:text-orange-400 font-black shrink-0">Q:</span>
+                            <span>{item.q}</span>
+                          </h5>
+                          <p className="text-slate-600 dark:text-slate-400 font-medium pl-7 mt-2 leading-relaxed text-sm">
+                            {item.a}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Documents Required Tab */}
+              {activeTab === 'requirements' && (
+                <div className="space-y-6 animate-fade-in text-left">
+                  <p className="text-slate-600 dark:text-slate-400 font-medium text-base mb-2">
+                    Make sure to gather one of the verified examples from each of the required document categories below:
+                  </p>
+                  <div className="grid gap-5">
+                    {docData.documentsRequired.map((req, idx) => (
+                      <div key={idx} className="flex items-start space-x-4 bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl hover:border-govorange/20 dark:hover:border-orange-900/20 transition-all text-left">
+                        <div className="w-10 h-10 bg-govorange/10 dark:bg-orange-500/10 rounded-xl flex items-center justify-center shrink-0 border border-orange-500/10">
+                          <FileText className="w-5 h-5 text-govorange" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-1.5">{req.name}</h4>
+                          <p className="text-slate-650 dark:text-slate-400 text-sm font-medium leading-normal">
+                            <strong className="text-slate-700 dark:text-slate-300">Acceptable Examples:</strong> {req.examples}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Steps to Apply Tab */}
+              {activeTab === 'apply' && (
+                <div className="space-y-8 pl-4 animate-fade-in text-left">
+                  <p className="text-slate-600 dark:text-slate-400 font-medium text-base mb-4 font-semibold">
+                    Follow this step-by-step procedure to file a new application for your {docData.name}:
+                  </p>
+                  <div className="relative border-l-2 border-slate-100 dark:border-slate-800 ml-4 pl-8 space-y-8 text-left">
+                    {docData.applySteps.map((step, idx) => (
+                      <div key={idx} className="relative group text-left">
+                        {/* Circle node with step number */}
+                        <div className="absolute -left-[45px] top-0 w-8 h-8 bg-gradient-to-br from-govblue to-indigo-600 dark:from-blue-500 dark:to-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md border-4 border-white dark:border-slate-900 group-hover:scale-110 transition-transform">
+                          {idx + 1}
+                        </div>
+                        <div className="bg-slate-50/40 dark:bg-slate-800/10 border border-transparent hover:border-slate-100 dark:hover:border-slate-800/80 p-5 rounded-2xl transition-all">
+                          <h4 className="text-md font-bold text-slate-850 dark:text-white mb-1">Step {idx + 1}</h4>
+                          <p className="text-slate-600 dark:text-slate-300 text-sm font-medium leading-relaxed">
+                            {step}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Correction & Update Tab */}
+              {activeTab === 'edit' && (
+                <div className="space-y-8 pl-4 animate-fade-in text-left">
+                  <p className="text-slate-600 dark:text-slate-400 font-medium text-base mb-4 font-semibold">
+                    Need to update or correct your {docData.name}? Follow these steps to submit edits:
+                  </p>
+                  <div className="relative border-l-2 border-slate-100 dark:border-slate-800 ml-4 pl-8 space-y-8 text-left">
+                    {docData.editSteps.map((step, idx) => (
+                      <div key={idx} className="relative group text-left">
+                        {/* Circle node with step number */}
+                        <div className="absolute -left-[45px] top-0 w-8 h-8 bg-gradient-to-br from-govorange to-amber-500 dark:from-orange-500 dark:to-amber-500 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md border-4 border-white dark:border-slate-900 group-hover:scale-110 transition-transform">
+                          {idx + 1}
+                        </div>
+                        <div className="bg-slate-50/40 dark:bg-slate-800/10 border border-transparent hover:border-slate-100 dark:hover:border-slate-800/80 p-5 rounded-2xl transition-all text-left">
+                          <h4 className="text-md font-bold text-slate-850 dark:text-white mb-1">Step {idx + 1}</h4>
+                          <p className="text-slate-650 dark:text-slate-300 text-sm font-medium leading-relaxed">
+                            {step}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-bold block mb-1">Official Government Link</span>
+                <span className="text-sm text-govblue dark:text-blue-400 font-bold break-all">{docData.portalUrl}</span>
               </div>
-            ) : (
-              <div className="whitespace-pre-wrap text-slate-700 dark:text-slate-300 font-medium leading-relaxed prose dark:prose-invert max-w-none">
-                {docGuide.split('\n').map((line, i) => {
-                   if (line.startsWith('# ')) return <h1 key={i} className="text-3xl font-black text-slate-900 dark:text-white mt-6 mb-4">{line.replace('# ', '')}</h1>;
-                   if (line.startsWith('## ')) return <h2 key={i} className="text-2xl font-bold text-govblue dark:text-blue-400 mt-6 mb-3">{line.replace('## ', '')}</h2>;
-                   if (line.startsWith('### ')) return <h3 key={i} className="text-xl font-bold text-slate-800 dark:text-slate-200 mt-4 mb-2">{line.replace('### ', '')}</h3>;
-                   if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold text-slate-800 dark:text-white my-2">{line.replace(/\*\*/g, '')}</p>;
-                   return <p key={i} className="my-2">{line.replace(/\*\*/g, '')}</p>;
-                })}
-              </div>
-            )}
+              
+              <a
+                href={docData.portalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-6 py-3.5 bg-gradient-to-r from-govblue to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/20 hover:scale-102 active:scale-98 transition-all shrink-0 w-full sm:w-auto justify-center text-sm"
+              >
+                <span>Visit Official Portal</span>
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      );
+    })()}
 
     </div>
   );
