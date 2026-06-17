@@ -81,11 +81,7 @@ export default function Home({ openBot }) {
     <div className="flex flex-col items-center justify-center pt-16 pb-32 text-center w-full relative overflow-hidden">
       
       {/* Hero Background Elements Removed */}
-      {/* Hero Badge */}
-      <div className="relative z-10 inline-flex items-center space-x-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700 px-5 py-2.5 rounded-full shadow-lg mb-12 animate-fade-in-up transition-colors hover:shadow-xl cursor-default drop-shadow-md">
-        <Sparkles className="w-5 h-5 text-govorange animate-pulse" />
-        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Nyayasetu Prototype v2 Now Live</span>
-      </div>
+
 
       {/* Hero Title */}
       <h1 className="relative z-10 text-6xl md:text-8xl font-black text-slate-900 dark:text-white mb-8 tracking-tight leading-[1.1] max-w-5xl transition-colors drop-shadow-2xl dark:drop-shadow-[0_10px_10px_rgba(255,255,255,0.05)]">
