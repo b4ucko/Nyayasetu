@@ -38,6 +38,9 @@ export default function DocumentAnalyzer() {
   const [tempFraudResult, setTempFraudResult] = useState(null);
   const [fraudAnimationDone, setFraudAnimationDone] = useState(false);
 
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [fraudProgress, setFraudProgress] = useState(0);
+
   // Wait for both OCR API response and animation to be complete before showing results
   useEffect(() => {
     if (tempResult && animationDone) {
@@ -71,6 +74,7 @@ export default function DocumentAnalyzer() {
     setResult(null);
     setTempResult(null);
     setAnimationDone(false);
+    setOcrProgress(0);
     setFraudResult(null);
     setTempFraudResult(null);
     setFraudAnimationDone(false);
@@ -78,14 +82,40 @@ export default function DocumentAnalyzer() {
     const formData = new FormData();
     formData.append('file', file);
 
+    let currentProgress = 0;
+    let apiDone = false;
+    let textResult = null;
+    let didFail = false;
+
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 95) {
+        currentProgress += 1.5;
+        setOcrProgress(currentProgress);
+      } else {
+        if (apiDone) {
+          currentProgress = Math.min(100, currentProgress + 3);
+          setOcrProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(progressInterval);
+            if (didFail) {
+              setTempResult("Error extracting text from document.");
+              setIsError(true);
+            } else {
+              setTempResult(textResult);
+            }
+          }
+        }
+      }
+    }, 100);
+
     try {
       const response = await axios.post('http://localhost:8000/api/ai/ocr', formData);
-      const textResult = response.data.extracted_text;
-      setTempResult(textResult);
+      textResult = response.data.extracted_text;
+      apiDone = true;
     } catch (error) {
       console.error("OCR Error:", error);
-      setTempResult("Error extracting text from document.");
-      setIsError(true);
+      didFail = true;
+      apiDone = true;
     }
   };
 
@@ -96,6 +126,7 @@ export default function DocumentAnalyzer() {
     setFraudResult(null);
     setTempFraudResult(null);
     setFraudAnimationDone(false);
+    setFraudProgress(0);
     setResult(null);
     setTempResult(null);
     setAnimationDone(false);
@@ -105,13 +136,40 @@ export default function DocumentAnalyzer() {
     const formData = new FormData();
     formData.append('file', file);
 
+    let currentProgress = 0;
+    let apiDone = false;
+    let fraudAnalysisResult = null;
+    let didFail = false;
+
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 95) {
+        currentProgress += 1.5;
+        setFraudProgress(currentProgress);
+      } else {
+        if (apiDone) {
+          currentProgress = Math.min(100, currentProgress + 3);
+          setFraudProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(progressInterval);
+            if (didFail) {
+              setTempFraudResult("Error verifying document authenticity.");
+              setFraudError(true);
+            } else {
+              setTempFraudResult(fraudAnalysisResult);
+            }
+          }
+        }
+      }
+    }, 100);
+
     try {
       const response = await axios.post('http://localhost:8000/api/ai/detect-fraud', formData);
-      setTempFraudResult(response.data.fraud_analysis);
+      fraudAnalysisResult = response.data.fraud_analysis;
+      apiDone = true;
     } catch (error) {
       console.error("Fraud Detection Error:", error);
-      setFraudError(true);
-      setTempFraudResult("Error verifying document authenticity.");
+      didFail = true;
+      apiDone = true;
     }
   };
 
@@ -120,18 +178,16 @@ export default function DocumentAnalyzer() {
       {loading ? (
         <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
           <ProgressiveFluxLoader 
+            value={ocrProgress}
             phases={OCR_PHASES} 
-            duration={10} 
-            loop={false}
             onComplete={() => setAnimationDone(true)}
           />
         </div>
       ) : loadingFraud ? (
         <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
           <ProgressiveFluxLoader 
+            value={fraudProgress}
             phases={FRAUD_PHASES} 
-            duration={12} 
-            loop={false}
             onComplete={() => setFraudAnimationDone(true)}
           />
         </div>

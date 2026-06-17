@@ -40,6 +40,7 @@ export default function NoticeChecker() {
   // States to delay display until animation finishes
   const [tempResult, setTempResult] = useState(null);
   const [animationDone, setAnimationDone] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   // Chat state
   const [messages, setMessages] = useState([]);
@@ -85,20 +86,45 @@ export default function NoticeChecker() {
     setAnalysisResult(null);
     setTempResult(null);
     setAnimationDone(false);
+    setProgress(0);
     setMessages([]); // Reset chat when new file is uploaded
 
     const formData = new FormData();
     formData.append('file', file);
 
+    let currentProgress = 0;
+    let apiDone = false;
+    let parsedData = null;
+
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 95) {
+        currentProgress += 1.5; // reaches 95% in about 6.3 seconds
+        setProgress(currentProgress);
+      } else {
+        if (apiDone) {
+          currentProgress = Math.min(100, currentProgress + 3);
+          setProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(progressInterval);
+            if (parsedData) {
+              setTempResult(parsedData);
+            } else {
+              setAnalysisError(true);
+              setAnalysisLoading(false);
+            }
+          }
+        }
+      }
+    }, 100);
+
     try {
       const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData);
       const cleanJson = response.data.analysis.replace(/```(json)?\n?/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      setTempResult(parsed);
+      parsedData = JSON.parse(cleanJson);
+      apiDone = true;
     } catch (error) {
       console.error("Notice Analysis Error:", error);
-      setAnalysisError(true);
-      setAnalysisLoading(false);
+      apiDone = true;
     }
   };
 
@@ -142,9 +168,8 @@ export default function NoticeChecker() {
       {analysisLoading ? (
         <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
           <ProgressiveFluxLoader 
+            value={progress}
             phases={NOTICE_PHASES} 
-            duration={12} 
-            loop={false} 
             onComplete={() => setAnimationDone(true)} 
           />
         </div>

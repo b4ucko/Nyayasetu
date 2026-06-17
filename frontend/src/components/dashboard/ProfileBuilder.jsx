@@ -34,6 +34,7 @@ export default function ProfileBuilder() {
   const [tempProfile, setTempProfile] = useState(null);
   const [tempVerifiedIdDetails, setTempVerifiedIdDetails] = useState(null);
   const [extractingDone, setExtractingDone] = useState(false);
+  const [extractProgress, setExtractProgress] = useState(0);
 
   // Wait for both OCR API response and animation to be complete before filling form
   useEffect(() => {
@@ -97,8 +98,36 @@ export default function ProfileBuilder() {
     setTempProfile(null);
     setTempVerifiedIdDetails(null);
     setExtractingDone(false);
+    setExtractProgress(0);
     const apiFormData = new FormData();
     apiFormData.append('file', file);
+
+    let currentProgress = 0;
+    let apiDone = false;
+    let newProfile = null;
+    let newVerifiedIdDetails = null;
+    let didFail = false;
+
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 95) {
+        currentProgress += 1.5;
+        setExtractProgress(currentProgress);
+      } else {
+        if (apiDone) {
+          currentProgress = Math.min(100, currentProgress + 3);
+          setExtractProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(progressInterval);
+            if (didFail) {
+              setExtracting(false);
+            } else {
+              setTempProfile(newProfile);
+              setTempVerifiedIdDetails(newVerifiedIdDetails || {});
+            }
+          }
+        }
+      }
+    }, 100);
 
     try {
       const response = await axios.post('http://localhost:8000/api/ai/extract-profile', apiFormData, {
@@ -106,29 +135,28 @@ export default function ProfileBuilder() {
       });
       const extractedData = response.data;
       
-      const newProfile = {
+      newProfile = {
         ...profile,
         age: extractedData.age || profile.age,
         state: extractedData.state || profile.state,
         gender: extractedData.gender || profile.gender,
       };
-      setTempProfile(newProfile);
       
       if (extractedData.id_type || extractedData.id_number_masked) {
-        setTempVerifiedIdDetails({
+        newVerifiedIdDetails = {
           id_type: extractedData.id_type || 'Certified ID',
           id_number_masked: extractedData.id_number_masked || 'Unknown',
           dob: extractedData.dob || 'Not found',
           full_address: extractedData.full_address || 'Not found',
           name: extractedData.name || 'Not Available'
-        });
-      } else {
-        setTempVerifiedIdDetails({});
+        };
       }
+      apiDone = true;
     } catch (error) {
       console.error("Error extracting profile:", error);
       alert("Failed to extract details from the ID. Please fill manually.");
-      setExtracting(false);
+      didFail = true;
+      apiDone = true;
     } finally {
       e.target.value = null;
     }
@@ -232,9 +260,8 @@ export default function ProfileBuilder() {
       {extracting ? (
         <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-855 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4 min-h-[350px]">
           <ProgressiveFluxLoader 
+            value={extractProgress}
             phases={EXTRACT_PHASES} 
-            duration={8} 
-            loop={false}
             onComplete={() => setExtractingDone(true)}
           />
         </div>

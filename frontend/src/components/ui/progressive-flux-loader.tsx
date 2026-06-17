@@ -92,13 +92,16 @@ const LETTER_TRANSITION: Transition = {
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
-/** Latest label whose threshold has been crossed. Expects pre-sorted phases. */
-function pickLabel(value: number, sortedPhases: ProgressiveFluxPhase[]) {
-  let active = sortedPhases[0]?.label ?? "";
-  for (const phase of sortedPhases) {
-    if (value >= phase.at) active = phase.label;
-  }
-  return active;
+/** Calculate minimum display duration for a phase based on label length to prevent word skipping. */
+function getLabelDuration(label: string): number {
+  const charCount = label.length;
+  // Exit transition of the previous label takes 0.45s.
+  const exitSec = 0.45;
+  // Entrance animation: base delay (0.18s) + letter transition delays + letter animation duration (0.45s)
+  const entranceSec = 0.18 + Math.max(0, charCount - 1) * 0.035 + 0.45;
+  // Hold duration for reading: let's give 1.0 second so the user has a calm, readable moment.
+  const holdSec = 1.0;
+  return (exitSec + entranceSec + holdSec) * 1000; // in milliseconds
 }
 
 /* ── label ───────────────────────────────────────────────────── */
@@ -183,7 +186,12 @@ export function ProgressiveFluxLoader({
 }: ProgressiveFluxLoaderProps) {
   const reduced = !!useReducedMotion();
   const isControlled = typeof value === "number";
-  const [internal, setInternal] = React.useState(0);
+
+  const [activePhaseIndex, setActivePhaseIndex] = React.useState(0);
+  const [phaseStartTime, setPhaseStartTime] = React.useState(0);
+  const [visualProgress, setVisualProgress] = React.useState(0);
+
+  const completedRef = React.useRef(false);
 
   // Keep the latest `onComplete` in a ref so a fresh inline callback on every
   // parent render never tears down and restarts the sweep below.
@@ -192,66 +200,139 @@ export function ProgressiveFluxLoader({
     onCompleteRef.current = onComplete;
   });
 
-  const completedRef = React.useRef(false);
-
-  // Uncontrolled self-run sweep.
-  React.useEffect(() => {
-    if (isControlled) return;
-    let raf = 0;
-    let timer = 0;
-    let start: number | null = null;
-    const totalMs = Math.max(500, duration * 1000);
-
-    const tick = (ts: number) => {
-      if (start === null) start = ts;
-      const pct = Math.min(100, ((ts - start) / totalMs) * 100);
-      setInternal(pct);
-      if (pct >= 100) {
-        if (!completedRef.current) {
-          completedRef.current = true;
-          onCompleteRef.current?.();
-        }
-        if (loop) {
-          start = null;
-          completedRef.current = false;
-          timer = window.setTimeout(() => {
-            setInternal(0);
-            raf = requestAnimationFrame(tick);
-          }, 700);
-        }
-        return;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-    };
-  }, [isControlled, duration, loop]);
-
-  const raw = isControlled ? value! : internal;
-  const current = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
-
-  // Controlled completion: fire once when `value` crosses 100, re-arm below it.
-  React.useEffect(() => {
-    if (!isControlled) return;
-    if (current >= 100 && !completedRef.current) {
-      completedRef.current = true;
-      onCompleteRef.current?.();
-    } else if (current < 100) {
-      completedRef.current = false;
-    }
-  }, [isControlled, current]);
-
   const sortedPhases = React.useMemo(
     () => [...phases].sort((a, b) => a.at - b.at),
     [phases],
   );
+
+  const target = isControlled ? value! : 100;
+
+  // We keep a ref of the current state so the RAF tick doesn't capture stale closures
+  const stateRef = React.useRef({
+    activePhaseIndex,
+    phaseStartTime,
+    visualProgress,
+    target,
+    phases: sortedPhases,
+    loop,
+    isControlled,
+  });
+
+  // Keep ref synchronized on every render
+  React.useEffect(() => {
+    stateRef.current.phases = sortedPhases;
+    stateRef.current.loop = loop;
+    stateRef.current.isControlled = isControlled;
+  });
+
+  // Sync target updates
+  React.useEffect(() => {
+    stateRef.current.target = target;
+    // If target resets to 0 (controlled), reset our visual progress immediately
+    if (isControlled && target === 0) {
+      setActivePhaseIndex(0);
+      setPhaseStartTime(Date.now());
+      setVisualProgress(0);
+      completedRef.current = false;
+      stateRef.current.activePhaseIndex = 0;
+      stateRef.current.phaseStartTime = Date.now();
+      stateRef.current.visualProgress = 0;
+    }
+  }, [target, isControlled]);
+
+  React.useEffect(() => {
+    let rafId = 0;
+    let loopTimeout = 0;
+
+    const tick = () => {
+      const now = Date.now();
+      const state = stateRef.current;
+      const { activePhaseIndex: idx, phaseStartTime: startT, target: currentTarget, phases: currentPhases } = state;
+
+      // Initialize phaseStartTime if not set
+      let currentStartT = startT;
+      if (currentStartT === 0) {
+        currentStartT = now;
+        setPhaseStartTime(now);
+        stateRef.current.phaseStartTime = now;
+      }
+
+      const currentPhase = currentPhases[idx];
+      const nextPhase = currentPhases[idx + 1];
+
+      // Get dynamic duration for the current phase based on its label length
+      const label = currentPhase?.label ?? "";
+      const currentPhaseDuration = getLabelDuration(label);
+
+      const elapsed = now - currentStartT;
+      let newIdx = idx;
+      let newStartT = currentStartT;
+
+      // Can we transition to the next phase?
+      if (nextPhase && elapsed >= currentPhaseDuration && currentTarget >= nextPhase.at) {
+        newIdx = idx + 1;
+        newStartT = now;
+        setActivePhaseIndex(newIdx);
+        setPhaseStartTime(newStartT);
+        stateRef.current.activePhaseIndex = newIdx;
+        stateRef.current.phaseStartTime = newStartT;
+      }
+
+      // Calculate progress interpolation
+      const phaseAt = currentPhase ? currentPhase.at : 0;
+      const nextPhaseAt = nextPhase ? nextPhase.at : 100;
+
+      const currentPhaseElapsed = now - newStartT;
+      const fraction = Math.min(1, currentPhaseElapsed / currentPhaseDuration);
+      
+      const interpolated = phaseAt + fraction * (nextPhaseAt - phaseAt);
+      const nextVisual = Math.min(currentTarget, interpolated);
+
+      setVisualProgress(nextVisual);
+      stateRef.current.visualProgress = nextVisual;
+
+      // Handle completion
+      if (nextVisual >= 100) {
+        if (!completedRef.current) {
+          completedRef.current = true;
+          onCompleteRef.current?.();
+        }
+
+        if (!state.isControlled && state.loop) {
+          // In uncontrolled mode with loop=true, reset after 700ms
+          loopTimeout = window.setTimeout(() => {
+            setActivePhaseIndex(0);
+            setPhaseStartTime(Date.now());
+            setVisualProgress(0);
+            completedRef.current = false;
+            stateRef.current.activePhaseIndex = 0;
+            stateRef.current.phaseStartTime = Date.now();
+            stateRef.current.visualProgress = 0;
+            rafId = requestAnimationFrame(tick);
+          }, 700);
+          return;
+        }
+      } else {
+        // If progress goes below 100 (e.g. controlled reset), re-arm
+        if (nextVisual < 100) {
+          completedRef.current = false;
+        }
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(loopTimeout);
+    };
+  }, []);
+
+  const current = Number.isFinite(visualProgress) ? Math.min(100, Math.max(0, visualProgress)) : 0;
   const label = React.useMemo(
-    () => pickLabel(current, sortedPhases),
-    [current, sortedPhases],
+    () => sortedPhases[activePhaseIndex]?.label ?? "",
+    [activePhaseIndex, sortedPhases],
   );
   const rounded = Math.round(current);
 

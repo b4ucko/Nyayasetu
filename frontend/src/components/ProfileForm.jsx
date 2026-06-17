@@ -43,6 +43,7 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
   const [tempRecommendedSchemes, setTempRecommendedSchemes] = useState(null);
   const [loadingDone, setLoadingDone] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [extractProgress, setExtractProgress] = useState(0);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -113,8 +114,36 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
     setTempFormData(null);
     setTempVerifiedIdDetails(null);
     setExtractingDone(false);
+    setExtractProgress(0);
     const apiFormData = new FormData();
     apiFormData.append('file', file);
+
+    let currentProgress = 0;
+    let apiDone = false;
+    let newFormData = null;
+    let newVerifiedIdDetails = null;
+    let didFail = false;
+
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 95) {
+        currentProgress += 1.5;
+        setExtractProgress(currentProgress);
+      } else {
+        if (apiDone) {
+          currentProgress = Math.min(100, currentProgress + 3);
+          setExtractProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(progressInterval);
+            if (didFail) {
+              setExtracting(false);
+            } else {
+              setTempFormData(newFormData);
+              setTempVerifiedIdDetails(newVerifiedIdDetails || {});
+            }
+          }
+        }
+      }
+    }, 100);
 
     try {
       const response = await axios.post('http://localhost:8000/api/extract-profile', apiFormData, {
@@ -122,29 +151,28 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
       });
       const extractedData = response.data;
       
-      const newFormData = {
+      newFormData = {
         ...formData,
         name: extractedData.name || formData.name,
         age: extractedData.age || formData.age,
         state: extractedData.state || formData.state,
       };
-      setTempFormData(newFormData);
       
       if (extractedData.id_type || extractedData.id_number_masked) {
-        setTempVerifiedIdDetails({
+        newVerifiedIdDetails = {
           id_type: extractedData.id_type || 'Certified ID',
           id_number_masked: extractedData.id_number_masked || 'Unknown',
           dob: extractedData.dob || 'Not found',
           full_address: extractedData.full_address || 'Not found',
           name: extractedData.name || extractedData.name
-        });
-      } else {
-        setTempVerifiedIdDetails({});
+        };
       }
+      apiDone = true;
     } catch (error) {
       console.error("Error extracting profile:", error);
       alert("Failed to extract details from the ID. Please fill manually.");
-      setExtracting(false);
+      didFail = true;
+      apiDone = true;
     } finally {
       e.target.value = null; // reset file input
     }
@@ -163,9 +191,8 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
       ) : extracting ? (
         <div className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px]">
           <ProgressiveFluxLoader 
+            value={extractProgress}
             phases={EXTRACT_PHASES} 
-            duration={8} 
-            loop={false}
             onComplete={() => setExtractingDone(true)}
           />
         </div>
