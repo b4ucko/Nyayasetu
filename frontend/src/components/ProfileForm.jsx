@@ -42,6 +42,7 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
 
   const [tempRecommendedSchemes, setTempRecommendedSchemes] = useState(null);
   const [loadingDone, setLoadingDone] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -76,16 +77,29 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setProgress(0);
     setTempRecommendedSchemes(null);
     setLoadingDone(false);
     setUserProfile(formData);
+
+    // Simulate progress starting from 0, approaching 95% logarithmically
+    let currentProgress = 0;
+    const progressInterval = setInterval(() => {
+      const remaining = 95 - currentProgress;
+      const step = Math.max(1, remaining * 0.15); // decelerate as we get closer to 95%
+      currentProgress = Math.min(95, currentProgress + step);
+      setProgress(currentProgress);
+    }, 250);
     
     try {
       // Send profile to FastAPI backend
       const response = await axios.post('http://localhost:8000/api/recommendations', formData);
+      clearInterval(progressInterval);
+      setProgress(100);
       setTempRecommendedSchemes(response.data.eligible_schemes);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
+      clearInterval(progressInterval);
       alert("Backend connection failed! Please ensure the FastAPI server is running.");
       setLoading(false);
     }
@@ -141,9 +155,8 @@ export default function ProfileForm({ setUserProfile, setRecommendedSchemes }) {
       {loading ? (
         <div className="glass p-8 md:p-12 rounded-3xl shadow-xl border border-white/60 relative overflow-hidden flex flex-col items-center justify-center py-20 min-h-[350px]">
           <ProgressiveFluxLoader 
+            value={progress}
             phases={SCHEME_PHASES} 
-            duration={10} 
-            loop={false}
             onComplete={() => setLoadingDone(true)}
           />
         </div>

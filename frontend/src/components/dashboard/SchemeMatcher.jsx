@@ -25,6 +25,7 @@ export default function SchemeMatcher() {
   // States to delay display until animation finishes
   const [tempSchemes, setTempSchemes] = useState(null);
   const [animationDone, setAnimationDone] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   // Hardcoded for prototype; ideally derived dynamically or fetched from backend
   const availableStates = ['All', 'Maharashtra', 'Karnataka', 'Delhi', 'Gujarat', 'Uttar Pradesh'];
@@ -67,8 +68,18 @@ export default function SchemeMatcher() {
     }
 
     setLoading(true);
+    setProgress(0);
     setTempSchemes(null);
     setAnimationDone(false);
+
+    // Simulate progress starting from 0, approaching 95% logarithmically
+    let currentProgress = 0;
+    const progressInterval = setInterval(() => {
+      const remaining = 95 - currentProgress;
+      const step = Math.max(1, remaining * 0.15); // decelerate as we get closer to 95%
+      currentProgress = Math.min(95, currentProgress + step);
+      setProgress(currentProgress);
+    }, 250);
 
     try {
       // 1. Fetch real user profile from Supabase
@@ -111,6 +122,9 @@ export default function SchemeMatcher() {
         category: s.category || ['Agriculture', 'Health', 'Education'][Math.floor(Math.random() * 3)],
         stateApplicability: s.stateApplicability || 'All'
       }));
+      
+      clearInterval(progressInterval);
+      setProgress(100);
       setTempSchemes(processedSchemes);
       setErrorMsg('');
     } catch (error) {
@@ -121,6 +135,8 @@ export default function SchemeMatcher() {
         { id: 'pm-kisan', name: 'PM Kisan Samman Nidhi', description: 'Income support to land-holding farmers.', eligibilityScore: 95, category: 'Agriculture', stateApplicability: 'All', officialWebsite: 'https://pmkisan.gov.in/' },
         { id: 'ayushman', name: 'Ayushman Bharat', description: 'Universal health coverage scheme.', eligibilityScore: 88, category: 'Health', stateApplicability: 'All', officialWebsite: 'https://pmjay.gov.in/' }
       ];
+      clearInterval(progressInterval);
+      setProgress(100);
       setTempSchemes(fallbackSchemes);
     }
   };
@@ -138,9 +154,8 @@ export default function SchemeMatcher() {
       {loading ? (
         <div className="py-20 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-850 rounded-2xl flex flex-col items-center justify-center shadow-inner animate-fade-in my-4">
           <ProgressiveFluxLoader 
+            value={progress}
             phases={SCHEME_PHASES} 
-            duration={10} 
-            loop={false}
             onComplete={() => setAnimationDone(true)}
           />
         </div>
