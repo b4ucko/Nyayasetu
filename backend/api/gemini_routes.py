@@ -1,6 +1,7 @@
 import os
 import time
 import html
+import hashlib
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from google import genai
@@ -11,6 +12,7 @@ from .validation_utils import validate_alphanumeric_dashed, validate_uploaded_fi
 
 # Initialize the router
 router = APIRouter()
+MATCHES_CACHE = {}
 
 # --- GEMINI CLIENT CONFIGURATION ---
 # Load up to 10 sequential API keys from environment variables
@@ -167,30 +169,76 @@ async def match_schemes(profile: UserProfile):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
     
-    filter_instruction = ""
-    if hasattr(profile, 'filterCategory') and profile.filterCategory:
-        filter_instruction += f"\nCRITICAL: The user is explicitly filtering for the '{profile.filterCategory}' sector. You MUST return EVERY SINGLE eligible scheme in this specific category."
-    if hasattr(profile, 'filterState') and profile.filterState:
-        filter_instruction += f"\nCRITICAL: The user is explicitly filtering for '{profile.filterState}'. You MUST include EVERY SINGLE state-level scheme for {profile.filterState} alongside applicable Central schemes."
+    # 1. Profile hashing and local caching
+    try:
+        profile_json = json.dumps(profile.model_dump(), sort_keys=True)
+        profile_hash = hashlib.md5(profile_json.encode('utf-8')).hexdigest()
+        if profile_hash in MATCHES_CACHE:
+            return MATCHES_CACHE[profile_hash]
+    except Exception as e:
+        profile_hash = None
+        print(f"Warning: Hashing/Caching setup failed: {e}")
 
+    # 2. RAG Context Generation (Query Chroma database)
+    schemes_context = ""
+    try:
+        from rag_pipeline.rag import GeminiEmbeddings, DB_DIR
+        from langchain_community.vectorstores import Chroma
+        
+        embeddings = GeminiEmbeddings()
+        # Verify client key is available
+        if embeddings.client and embeddings.client.api_key:
+            vectorstore = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
+            search_query = f"Government schemes for state {profile.state}, age {profile.age}, occupation {profile.occupation}, category {profile.filterCategory or 'all'}, gender {profile.gender or 'all'}"
+            matching_docs = vectorstore.similarity_search(search_query, k=12)
+            
+            for doc in matching_docs:
+                schemes_context += f"---\n{doc.page_content}\nMetadata: {json.dumps(doc.metadata)}\n"
+    except Exception as e:
+        print(f"Warning: Chroma vector DB search failed ({e}). Falling back to local dataset file.")
+        schemes_context = ""
+
+    # 3. Local JSON Registry Fallback
+    if not schemes_context:
+        try:
+            dataset_path = os.path.join(os.path.dirname(__file__), "../datasets/dataset.json")
+            if os.path.exists(dataset_path):
+                with open(dataset_path, "r", encoding="utf-8") as f:
+                    local_schemes = json.load(f)
+                
+                filtered_local = []
+                for s in local_schemes:
+                    # Filter category
+                    if profile.filterCategory and s.get("category", "").lower() != profile.filterCategory.lower():
+                        continue
+                    # Filter state applicability
+                    state_app = s.get("stateApplicability", "All India")
+                    if profile.filterState and state_app != "All India" and state_app.lower() != profile.filterState.lower():
+                        continue
+                    filtered_local.append(s)
+                
+                target_schemes = filtered_local if filtered_local else local_schemes
+                
+                for s in target_schemes:
+                    schemes_context += (
+                        f"---\n"
+                        f"Scheme Name: {s.get('scheme_name')}\n"
+                        f"Category: {s.get('category')}\n"
+                        f"Eligibility: {s.get('eligibility')}\n"
+                        f"Benefits: {s.get('benefits')}\n"
+                        f"Required Documents: {', '.join(s.get('required_documents', []))}\n"
+                        f"Ministry: {s.get('ministry')}\n"
+                        f"Metadata: {json.dumps({'id': s.get('id'), 'name': s.get('scheme_name'), 'category': s.get('category'), 'officialWebsite': s.get('officialWebsite')})}\n"
+                    )
+        except Exception as ex:
+            print(f"Warning: Dataset file fallback failed: {ex}")
+
+    # 4. Prompt Optimization for compact outputs
     prompt = f"""
-    You are the absolute definitive, exhaustive database of EVERY SINGLE central and state government scheme in India (acting as an omniscient MyScheme portal).
-    You have deep, native access to thousands of schemes natively across every single state and every single department in the country.
-    Carefully cross-reference the Citizen's profile below against EVERY known scheme in the country.
+    You are an expert Indian Government Scheme matching advisor.
+    Evaluate the Citizen profile below against the candidate government schemes provided in the Context.
     
-    You MUST return an EXHAUSTIVE, UNBOUNDED array of EVERY SINGLE government scheme they actively qualify for based on their exact state, caste, age, income, and gender. 
-    DO NOT STOP AT 5 OR 10. If they are eligible for 30 schemes, return all 30. If they are eligible for 50, return all 50. Output the absolute maximum number of valid schemes possible.
-    {filter_instruction}
-    
-    You MUST extract the following details perfectly for each scheme:
-    - name: Official legal Name of the scheme
-    - description: Exact summary of what financial or resources it provides
-    - eligibilityScore: 70 to 100 based on their profile match
-    - category: The sector (e.g., 'Agriculture', 'Health', 'Education', 'Housing', 'Finance')
-    - stateApplicability: 'All India', or the exact specific state name if it's a state-only scheme (e.g., 'Maharashtra')
-    - id: A URL slug (e.g., 'pm-kisan')
-    - officialWebsite: The exact authentic government URL (e.g., 'https://pmkisan.gov.in')
-    Profile details:
+    Citizen Profile:
     Name: {profile.name}
     Age: {profile.age}
     Gender: {profile.gender}
@@ -202,23 +250,44 @@ async def match_schemes(profile: UserProfile):
     Income: ₹{profile.income}
     State: {profile.state}
     Land Holding: {profile.land_acres} acres
+
+    Context - Candidate Schemes:
+    {schemes_context}
+
+    CRITICAL RULES:
+    1. Only return schemes from the Context above that the citizen is eligible for based on their profile criteria. Do not output any other schemes.
+    2. Keep the JSON field 'description' very short (maximum 1-2 brief sentences) stating the primary benefit and why the citizen qualifies.
+    3. Determine the 'id' field by matching it to the key in metadata (or slugify the scheme name, e.g., 'pm-kisan').
+    4. Provide the correct officialWebsite from the context.
+    5. Set the 'eligibilityScore' (70-100) based on criteria suitability.
     """
 
     try:
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=RecommendationsList,
-                temperature=0.2
+        import asyncio
+        # Invoke Gemini content generation with strict 15 seconds timeout
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=RecommendationsList,
+                    temperature=0.2
+                ),
             ),
+            timeout=15.0
         )
-        # Parse the JSON string returned by Gemini into a Python dictionary
         data = json.loads(response.text)
+        
+        # Save to memory cache
+        if profile_hash and data:
+            MATCHES_CACHE[profile_hash] = data
+            
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI Recommendation request timed out. Trying next fallback key.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI Recommendation failed: {str(e)}")")
 
 
 @router.get("/ai/scheme/{scheme_name}")

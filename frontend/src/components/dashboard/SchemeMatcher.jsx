@@ -73,73 +73,76 @@ export default function SchemeMatcher() {
     setTempSchemes(null);
     setAnimationDone(false);
 
-    // Simulate progress starting from 0, approaching 95% logarithmically
-    let currentProgress = 0;
-    const progressInterval = setInterval(() => {
-      const remaining = 95 - currentProgress;
-      const step = Math.max(1, remaining * 0.15); // decelerate as we get closer to 95%
-      currentProgress = Math.min(95, currentProgress + step);
-      setProgress(currentProgress);
-    }, 250);
+    // Yield control to the browser thread so the loader displays immediately without startup lag
+    setTimeout(async () => {
+      // Simulate progress starting from 0, approaching 95% logarithmically but quickly
+      let currentProgress = 0;
+      const progressInterval = setInterval(() => {
+        const remaining = 95 - currentProgress;
+        const step = Math.max(1, remaining * 0.15); // decelerate smoothly as we get closer to 95%
+        currentProgress = Math.min(95, currentProgress + step);
+        setProgress(currentProgress);
+      }, 100);
 
-    try {
-      // 1. Fetch real user profile from Supabase
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      try {
+        // 1. Fetch real user profile from Supabase
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      let profileData = {};
-      if (data && !error) {
-        profileData = data;
-      } else {
-        console.warn("No specific profile found in Supabase. Falling back.");
-        profileData = { age: 'unknown', occupation: 'unknown', state: 'unknown' };
+        let profileData = {};
+        if (data && !error) {
+          profileData = data;
+        } else {
+          console.warn("No specific profile found in Supabase. Falling back.");
+          profileData = { age: 'unknown', occupation: 'unknown', state: 'unknown' };
+        }
+
+        // Construct payload matching backend UserProfile BaseModel
+        const payload = {
+          name: profileData.name || "Citizen",
+          age: Number(profileData.age) || 30,
+          occupation: profileData.occupation || "Unemployed",
+          income: Number(profileData.income) || 0,
+          state: profileData.state || "Maharashtra",
+          land_acres: 0,
+          gender: profileData.gender || "",
+          marital_status: profileData.marital_status || "",
+          caste: profileData.caste || "",
+          disability: profileData.disability || "No",
+          education: profileData.education || "",
+          filterState: filterState !== 'All' ? filterState : "",
+          filterCategory: filterCategory !== 'All' ? filterCategory : ""
+        };
+
+        // 2. Call backend with real profile
+        const response = await axios.post('http://localhost:8000/api/ai/match', payload, { timeout: 120000 });
+
+        const processedSchemes = (response.data.schemes || []).map(s => ({
+          ...s,
+          category: s.category || ['Agriculture', 'Health', 'Education'][Math.floor(Math.random() * 3)],
+          stateApplicability: s.stateApplicability || 'All'
+        }));
+        
+        clearInterval(progressInterval);
+        setProgress(100);
+        setTempSchemes(processedSchemes);
+        setErrorMsg('');
+      } catch (error) {
+        console.error("Error matching schemes:", error);
+        setErrorMsg("Backend timeout or API Key error. Showing fallback schemes.");
+        // Fallback mock data if backend fails
+        const fallbackSchemes = [
+          { id: 'pm-kisan', name: 'PM Kisan Samman Nidhi', description: 'Income support to land-holding farmers.', eligibilityScore: 95, category: 'Agriculture', stateApplicability: 'All', officialWebsite: 'https://pmkisan.gov.in/' },
+          { id: 'ayushman', name: 'Ayushman Bharat', description: 'Universal health coverage scheme.', eligibilityScore: 88, category: 'Health', stateApplicability: 'All', officialWebsite: 'https://pmjay.gov.in/' }
+        ];
+        clearInterval(progressInterval);
+        setProgress(100);
+        setTempSchemes(fallbackSchemes);
       }
-
-      // Construct payload matching backend UserProfile BaseModel
-      const payload = {
-        name: profileData.name || "Citizen",
-        age: Number(profileData.age) || 30,
-        occupation: profileData.occupation || "Unemployed",
-        income: Number(profileData.income) || 0,
-        state: profileData.state || "Maharashtra",
-        land_acres: 0,
-        gender: profileData.gender || "",
-        marital_status: profileData.marital_status || "",
-        caste: profileData.caste || "",
-        disability: profileData.disability || "No",
-        education: profileData.education || "",
-        filterState: filterState !== 'All' ? filterState : "",
-        filterCategory: filterCategory !== 'All' ? filterCategory : ""
-      };
-
-      // 2. Call backend with real profile
-      const response = await axios.post('http://localhost:8000/api/ai/match', payload, { timeout: 120000 });
-
-      const processedSchemes = (response.data.schemes || []).map(s => ({
-        ...s,
-        category: s.category || ['Agriculture', 'Health', 'Education'][Math.floor(Math.random() * 3)],
-        stateApplicability: s.stateApplicability || 'All'
-      }));
-      
-      clearInterval(progressInterval);
-      setProgress(100);
-      setTempSchemes(processedSchemes);
-      setErrorMsg('');
-    } catch (error) {
-      console.error("Error matching schemes:", error);
-      setErrorMsg("Backend timeout or API Key error. Showing fallback schemes.");
-      // Fallback mock data if backend fails
-      const fallbackSchemes = [
-        { id: 'pm-kisan', name: 'PM Kisan Samman Nidhi', description: 'Income support to land-holding farmers.', eligibilityScore: 95, category: 'Agriculture', stateApplicability: 'All', officialWebsite: 'https://pmkisan.gov.in/' },
-        { id: 'ayushman', name: 'Ayushman Bharat', description: 'Universal health coverage scheme.', eligibilityScore: 88, category: 'Health', stateApplicability: 'All', officialWebsite: 'https://pmjay.gov.in/' }
-      ];
-      clearInterval(progressInterval);
-      setProgress(100);
-      setTempSchemes(fallbackSchemes);
-    }
+    }, 100);
   };
 
   const filteredSchemes = useMemo(() => {
