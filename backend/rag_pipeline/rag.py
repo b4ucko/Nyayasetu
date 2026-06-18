@@ -84,7 +84,13 @@ def load_and_embed_data():
         text += f"Required Documents: {', '.join(scheme['required_documents'])}\n"
         text += f"Ministry: {scheme['ministry']}"
         
-        metadata = {"id": scheme["id"], "name": scheme["scheme_name"], "category": scheme["category"]}
+        metadata = {
+            "id": scheme["id"],
+            "name": scheme["scheme_name"],
+            "category": scheme["category"],
+            "stateApplicability": scheme.get("stateApplicability", "All India"),
+            "officialWebsite": scheme.get("officialWebsite", "")
+        }
         docs.append(Document(page_content=text, metadata=metadata))
 
     print(f"Loaded {len(docs)} schemes. Generating Gemini embeddings...")

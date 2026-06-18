@@ -217,47 +217,43 @@ async def match_schemes(profile: UserProfile):
         print(f"Warning: Chroma vector DB search failed ({e}). Falling back to local dataset file.")
         schemes_context = ""
 
-    # 3. Local JSON Registry Fallback
+    # 3. Local SQLite Registry Fallback
     if not schemes_context:
         try:
-            dataset_path = os.path.join(os.path.dirname(__file__), "../datasets/dataset.json")
-            if os.path.exists(dataset_path):
-                with open(dataset_path, "r", encoding="utf-8") as f:
-                    local_schemes = json.load(f)
+            import sys
+            parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            if parent_dir not in sys.path:
+                sys.path.append(parent_dir)
+            from datasets.database import query_schemes
+            
+            target_state = profile.filterState if profile.filterState else profile.state
+            target_category = profile.filterCategory if profile.filterCategory else None
+            
+            target_schemes = query_schemes(state=target_state, category=target_category)
+            if not target_schemes:
+                # If no schemes matched with state filter, fall back to matching just by category or get all schemes
+                target_schemes = query_schemes(category=target_category)
                 
-                filtered_local = []
-                for s in local_schemes:
-                    # Filter category
-                    if profile.filterCategory and s.get("category", "").lower() != profile.filterCategory.lower():
-                        continue
-                    # Filter state applicability
-                    state_app = s.get("stateApplicability", "All India")
-                    if profile.filterState and state_app != "All India" and state_app.lower() != profile.filterState.lower():
-                        continue
-                    filtered_local.append(s)
-                
-                target_schemes = filtered_local if filtered_local else local_schemes
-                
-                PAGE_SIZE = 10
-                start_idx = (profile.page - 1) * PAGE_SIZE
-                end_idx = start_idx + PAGE_SIZE
-                
-                sliced_schemes = target_schemes[start_idx:end_idx]
-                has_more = end_idx < len(target_schemes)
-                
-                for s in sliced_schemes:
-                    schemes_context += (
-                        f"---\n"
-                        f"Scheme Name: {s.get('scheme_name')}\n"
-                        f"Category: {s.get('category')}\n"
-                        f"Eligibility: {s.get('eligibility')}\n"
-                        f"Benefits: {s.get('benefits')}\n"
-                        f"Required Documents: {', '.join(s.get('required_documents', []))}\n"
-                        f"Ministry: {s.get('ministry')}\n"
-                        f"Metadata: {json.dumps({'id': s.get('id'), 'name': s.get('scheme_name'), 'category': s.get('category'), 'officialWebsite': s.get('officialWebsite')})}\n"
-                    )
+            PAGE_SIZE = 10
+            start_idx = (profile.page - 1) * PAGE_SIZE
+            end_idx = start_idx + PAGE_SIZE
+            
+            sliced_schemes = target_schemes[start_idx:end_idx]
+            has_more = end_idx < len(target_schemes)
+            
+            for s in sliced_schemes:
+                schemes_context += (
+                    f"---\n"
+                    f"Scheme Name: {s.get('scheme_name')}\n"
+                    f"Category: {s.get('category')}\n"
+                    f"Eligibility: {s.get('eligibility')}\n"
+                    f"Benefits: {s.get('benefits')}\n"
+                    f"Required Documents: {', '.join(s.get('required_documents', []))}\n"
+                    f"Ministry: {s.get('ministry')}\n"
+                    f"Metadata: {json.dumps({'id': s.get('id'), 'name': s.get('scheme_name'), 'category': s.get('category'), 'officialWebsite': s.get('officialWebsite')})}\n"
+                )
         except Exception as ex:
-            print(f"Warning: Dataset file fallback failed: {ex}")
+            print(f"Warning: SQLite database fallback failed: {ex}")
 
     # 4. Prompt Optimization for compact outputs
     prompt = f"""
