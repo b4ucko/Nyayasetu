@@ -3,6 +3,7 @@ import axios from 'axios';
 import { UploadCloud, MessageSquare, AlertTriangle, FileText, Send, User, Bot, AlertCircle } from 'lucide-react';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 
 const NOTICE_PHASES = [
   { at: 0, label: "uploading document..." },
@@ -32,15 +33,75 @@ const ExpandableText = ({ text, className }) => {
   );
 };
 
+// Pure JS client-side image compression using HTML5 Canvas API
+const compressImage = (file) => {
+  return new Promise((resolve) => {
+    // Only compress images, return PDF files as-is
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Constraint max width and height to 1600px for swift OCR and crisp layout
+        const MAX_WIDTH = 1600;
+        const MAX_HEIGHT = 1600;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress as JPEG format with 0.8 quality factor
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function NoticeChecker() {
   const [file, setFile] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState(false);
-
-  // States to delay display until animation finishes
-  const [tempResult, setTempResult] = useState(null);
-  const [animationDone, setAnimationDone] = useState(false);
   const [progress, setProgress] = useState(0);
 
   // Chat state
@@ -62,70 +123,66 @@ export default function NoticeChecker() {
     scrollToBottom();
   }, [messages]);
 
-  // Wait for both API response and animation to be complete before showing results
-  useEffect(() => {
-    if (tempResult && animationDone) {
-      setAnalysisResult(tempResult);
-      setMessages([
-        { 
-          role: 'system', 
-          content: `I've analyzed your ${tempResult.notice_type || 'notice'}. You can now ask me any specific questions about it, what it means, or what you should do next.` 
-        }
-      ]);
-      setAnalysisLoading(false);
-      setTempResult(null);
-      setAnimationDone(false);
-    }
-  }, [tempResult, animationDone]);
-
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) return;
 
+    // Client-side validations
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!allowedExtensions.includes(fileExtension)) {
+      alert("Unsupported file type. Only PDF and images (.jpg, .jpeg, .png, .webp) are allowed.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File exceeds maximum allowed size of 10MB.");
+      return;
+    }
+
     setAnalysisLoading(true);
     setAnalysisError(false);
     setAnalysisResult(null);
-    setTempResult(null);
-    setAnimationDone(false);
     setProgress(0);
     setMessages([]); // Reset chat when new file is uploaded
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     let currentProgress = 0;
-    let apiDone = false;
-    let parsedData = null;
-
     const progressInterval = setInterval(() => {
       if (currentProgress < 95) {
         currentProgress += 1.5; // reaches 95% in about 6.3 seconds
         setProgress(currentProgress);
-      } else {
-        if (apiDone) {
-          currentProgress = Math.min(100, currentProgress + 3);
-          setProgress(currentProgress);
-          if (currentProgress >= 100) {
-            clearInterval(progressInterval);
-            if (parsedData) {
-              setTempResult(parsedData);
-            } else {
-              setAnalysisError(true);
-              setAnalysisLoading(false);
-            }
-          }
-        }
       }
     }, 100);
 
     try {
+      // Compress the image before uploading to reduce network traffic
+      const compressedFile = await compressImage(file);
+
+      const formData = new FormData();
+      formData.append('file', compressedFile);
+
       const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData);
-      const cleanJson = response.data.analysis.replace(/```(json)?\n?/g, '').replace(/```/g, '').trim();
-      parsedData = JSON.parse(cleanJson);
-      apiDone = true;
+      
+      // Direct JSON parsing from native backend dict (no regex string replacements)
+      const cleanData = response.data.analysis;
+      const parsedData = typeof cleanData === 'string' ? JSON.parse(cleanData) : cleanData;
+
+      clearInterval(progressInterval);
+      setProgress(100);
+      setAnalysisResult(parsedData);
+      setMessages([
+        { 
+          role: 'system', 
+          content: `I've analyzed your ${parsedData.notice_type || 'notice'}. You can now ask me any specific questions about it, what it means, or what you should do next.` 
+        }
+      ]);
+      setAnalysisLoading(false);
     } catch (error) {
       console.error("Notice Analysis Error:", error);
-      apiDone = true;
+      clearInterval(progressInterval);
+      setAnalysisError(true);
+      setAnalysisLoading(false);
     }
   };
 
@@ -154,16 +211,6 @@ export default function NoticeChecker() {
 
 
 
-  // Helper to safely format markdown from the AI
-  const formatText = (text) => {
-    return text.split('\n').map((line, i) => (
-      <span key={i}>
-        {line}
-        <br />
-      </span>
-    ));
-  };
-
   return (
     <div className="p-4 glass dark:bg-slate-800/50 rounded-2xl shadow-xl w-full max-w-6xl mx-auto space-y-4 border border-white dark:border-slate-700 transition-colors text-left">
       <AnimatePresence mode="wait">
@@ -179,7 +226,6 @@ export default function NoticeChecker() {
             <ProgressiveFluxLoader 
               value={progress}
               phases={NOTICE_PHASES} 
-              onComplete={() => setAnimationDone(true)} 
             />
           </motion.div>
         ) : (
@@ -283,7 +329,13 @@ export default function NoticeChecker() {
                           {msg.role === 'user' ? <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> : <Bot className="w-5 h-5 text-slate-600 dark:text-slate-300" />}
                         </div>
                         <div className={`p-3.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-sm shadow-sm'}`}>
-                          {formatText(msg.content)}
+                          {msg.role === 'user' ? (
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          ) : (
+                            <div className="prose prose-sm dark:prose-invert text-slate-700 dark:text-slate-300 max-w-none">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                          )}
                         </div>
                      </div>
                    ))}

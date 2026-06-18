@@ -1,34 +1,16 @@
 import os
 import time
+import html
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from google import genai
 from google.genai import types
 import json
 
+from .validation_utils import validate_alphanumeric_dashed, validate_uploaded_file
+
 # Initialize the router
 router = APIRouter()
-
-# Global AI Rate Limiter (Protects the Gemini Free Tier Free API Key)
-class AIRateLimiter:
-    def __init__(self, max_rpm=12):
-        self.max_rpm = max_rpm
-        self.timestamps = []
-
-    def check_limit(self):
-        current_time = time.time()
-        # Filter timestamps older than 60 seconds
-        self.timestamps = [ts for ts in self.timestamps if current_time - ts < 60.0]
-        
-        if len(self.timestamps) >= self.max_rpm:
-            raise HTTPException(
-                status_code=429, 
-                detail="Safety Limit Reached: To protect your Gemini API Key from being blocked, please wait 30 seconds before submitting another AI request."
-            )
-        self.timestamps.append(current_time)
-
-# Initialize limiter to a much higher threshold (assuming upgraded tier or using flash-8b)
-api_limiter = AIRateLimiter(max_rpm=100)
 
 # --- GEMINI CLIENT CONFIGURATION ---
 # Load up to 10 sequential API keys from environment variables
@@ -111,22 +93,45 @@ scanner_client = client
 # Models
 # -----------------------------------------------------
 class UserProfile(BaseModel):
-    name: str
-    age: int
-    occupation: str
-    income: float
-    state: str
-    land_acres: float = 0.0
-    gender: str = ""
-    marital_status: str = ""
-    caste: str = ""
-    disability: str = "No"
-    education: str = ""
-    filterCategory: str = ""
-    filterState: str = ""
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True
+    )
+
+    name: str = Field(..., min_length=1, max_length=100)
+    age: int = Field(..., ge=0, le=125)
+    occupation: str = Field(..., min_length=1, max_length=100)
+    income: float = Field(..., ge=0.0, le=1000000000.0)
+    state: str = Field(..., min_length=1, max_length=100)
+    land_acres: float = Field(default=0.0, ge=0.0, le=100000.0)
+    gender: str = Field(default="", max_length=50)
+    marital_status: str = Field(default="", max_length=50)
+    caste: str = Field(default="", max_length=50)
+    disability: str = Field(default="No", max_length=50)
+    education: str = Field(default="", max_length=100)
+    filterCategory: str = Field(default="", max_length=100)
+    filterState: str = Field(default="", max_length=100)
+
+    @field_validator(
+        "name", "occupation", "state", "gender", "marital_status",
+        "caste", "disability", "education", "filterCategory", "filterState"
+    )
+    @classmethod
+    def sanitize_strings(cls, v: str) -> str:
+        # Escape HTML inputs to prevent injection / XSS
+        return html.escape(v)
 
 class VoiceRequest(BaseModel):
-    transcript: str
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True
+    )
+    transcript: str = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("transcript")
+    @classmethod
+    def sanitize_transcript(cls, v: str) -> str:
+        return html.escape(v)
 
 # -----------------------------------------------------
 # Schema for AI Matcher Output
@@ -161,8 +166,6 @@ class NoticeAnalysisSchema(BaseModel):
 async def match_schemes(profile: UserProfile):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
-    
-    api_limiter.check_limit()
     
     filter_instruction = ""
     if hasattr(profile, 'filterCategory') and profile.filterCategory:
@@ -223,11 +226,11 @@ async def get_scheme_details(scheme_name: str):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
     
-    api_limiter.check_limit()
+    sanitized_scheme_name = validate_alphanumeric_dashed(scheme_name, max_len=100)
     
     prompt = f"""
     You are an expert government scheme advisor.
-    Provide a comprehensive guide for the government scheme named "{scheme_name}" formatted in Markdown.
+    Provide a comprehensive guide for the government scheme named "{sanitized_scheme_name}" formatted in Markdown.
 
     Please include exactly these sections:
     # Scheme Overview
@@ -259,17 +262,17 @@ async def get_document_guide(document_name: str):
     if not guides_client:
         raise HTTPException(status_code=500, detail="Secondary Gemini Guides client not initialized. Check API Key.")
     
-    api_limiter.check_limit()
+    sanitized_document_name = validate_alphanumeric_dashed(document_name, max_len=100)
     
     prompt = f"""
     You are an expert Indian Government Document Advisor. 
-    Provide an EXTREMELY BRIEF, short, and sweet practical guide to applying for and editing the document: "{document_name}". 
+    Provide an EXTREMELY BRIEF, short, and sweet practical guide to applying for and editing the document: "{sanitized_document_name}". 
     
     CRITICAL: Keep it incredibly concise to generate text fast. Use maximum 3 bullet points per section. 
     You MUST provide the exact official government website URL for applying.
 
     Include exactly these sections formatted in clean Markdown:
-    # 📄 Guide to {document_name}
+    # 📄 Guide to {sanitized_document_name}
     ## 📋 Documents Required (Short list)
     ## 💻 Quick Application Steps
     ## ✏️ Quick Editing Steps
@@ -298,7 +301,11 @@ async def analyze_document(file: UploadFile = File(...)):
     if not scanner_client:
         raise HTTPException(status_code=500, detail="Tertiary Gemini Scanner client not initialized. Check API Key.")
     
-    api_limiter.check_limit()
+    validate_uploaded_file(
+        file,
+        allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
+        max_size_bytes=10 * 1024 * 1024  # 10MB limit
+    )
     
     try:
         # Read file bytes
@@ -353,7 +360,11 @@ async def detect_document_fraud(file: UploadFile = File(...)):
     if not scanner_client:
         raise HTTPException(status_code=500, detail="Tertiary Gemini Scanner client not initialized. Check API Key.")
     
-    api_limiter.check_limit()
+    validate_uploaded_file(
+        file,
+        allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
+        max_size_bytes=10 * 1024 * 1024  # 10MB limit
+    )
     
     try:
         file_bytes = await file.read()
@@ -398,7 +409,11 @@ async def extract_profile_from_id(file: UploadFile = File(...)):
     if not scanner_client:
         raise HTTPException(status_code=500, detail="Scanner client not initialized.")
     
-    api_limiter.check_limit()
+    validate_uploaded_file(
+        file,
+        allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
+        max_size_bytes=10 * 1024 * 1024  # 10MB limit
+    )
 
     try:
         file_bytes = await file.read()
@@ -454,7 +469,22 @@ async def generate_document(
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized.")
         
-    api_limiter.check_limit()
+    # Input bounds check and escaping
+    if not prompt_text or len(prompt_text) > 10000:
+        raise HTTPException(status_code=400, detail="prompt_text length must be between 1 and 10000 characters.")
+    sanitized_prompt_text = html.escape(prompt_text.strip())
+
+    sanitized_document_context = ""
+    if document_context:
+        if len(document_context) > 100000:
+            raise HTTPException(status_code=400, detail="document_context exceeds maximum length of 100000 characters.")
+        sanitized_document_context = html.escape(document_context.strip())
+
+    sanitized_profile_context = ""
+    if profile_context:
+        if len(profile_context) > 10000:
+            raise HTTPException(status_code=400, detail="profile_context exceeds maximum length of 10000 characters.")
+        sanitized_profile_context = html.escape(profile_context.strip())
 
     system_instruction = (
         "You are an expert Indian Legal and Administrative Drafter. "
@@ -472,11 +502,11 @@ async def generate_document(
         "Always reference official Indian Acts (like RTI Act, 2005, Consumer Protection Act) accurately where relevant."
     )
     
-    contents = [f"User Request: {prompt_text}"]
-    if document_context:
-        contents.append(f"Context from uploaded document: {document_context}")
-    if profile_context:
-        contents.append(f"User Profile details: {profile_context}")
+    contents = [f"User Request: {sanitized_prompt_text}"]
+    if sanitized_document_context:
+        contents.append(f"Context from uploaded document: {sanitized_document_context}")
+    if sanitized_profile_context:
+        contents.append(f"User Profile details: {sanitized_profile_context}")
 
     try:
         response = await client.aio.models.generate_content(
@@ -490,7 +520,6 @@ async def generate_document(
         return {"markdown": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Document Generation failed: {str(e)}")
-
 
 
 @router.post("/ai/voice")
@@ -508,6 +537,24 @@ async def voice_assistant(
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
     
+    sanitized_transcript = ""
+    if transcript:
+        if len(transcript) > 5000:
+            raise HTTPException(status_code=400, detail="transcript length exceeds 5000 characters.")
+        sanitized_transcript = html.escape(transcript.strip())
+
+    sanitized_profile_context = ""
+    if profile_context:
+        if len(profile_context) > 10000:
+            raise HTTPException(status_code=400, detail="profile_context length exceeds 10000 characters.")
+        sanitized_profile_context = html.escape(profile_context.strip())
+
+    sanitized_document_context = ""
+    if document_context:
+        if len(document_context) > 100000:
+            raise HTTPException(status_code=400, detail="document_context length exceeds 100000 characters.")
+        sanitized_document_context = html.escape(document_context.strip())
+
     system_instruction = (
         "You are Omni-Gov Voice Assistant, an expert, warm, and highly capable legal/administrative advocate for the citizen. "
         "1. Legal FAQ & Rights: Answer legal questions, reference relevant acts (like Consumer Protection, RTI), and explain what they mean practically. "
@@ -516,20 +563,29 @@ async def voice_assistant(
         "4. Document Analysis: If 'document_context' is provided, answer questions related to the document practically. "
         "Keep your response concise, conversational, and under 3 or 4 sentences if possible since it will be spoken aloud to them. Never say 'I am an AI'."
     )
-    if profile_context:
-        system_instruction += f"\n\nContext - User Profile: {profile_context}"
-    if document_context:
-        system_instruction += f"\n\nContext - Extracted info from user's recently uploaded document: {document_context}"
+    if sanitized_profile_context:
+        system_instruction += f"\n\nContext - User Profile: {sanitized_profile_context}"
+    if sanitized_document_context:
+        system_instruction += f"\n\nContext - Extracted info from user's recently uploaded document: {sanitized_document_context}"
     
     try:
         contents = []
         if audio and audio.filename:
+            # Validate uploaded audio file
+            validate_uploaded_file(
+                audio,
+                allowed_mimes=[
+                    "audio/webm", "video/webm", "audio/wav", "audio/x-wav", 
+                    "audio/mpeg", "audio/ogg", "application/octet-stream"
+                ],
+                max_size_bytes=5 * 1024 * 1024  # 5MB limit for voice files
+            )
             file_bytes = await audio.read()
             contents.append(types.Part.from_bytes(data=file_bytes, mime_type=audio.content_type or 'audio/webm'))
-        elif transcript:
-            contents.append(transcript)
+        elif sanitized_transcript:
+            contents.append(sanitized_transcript)
         else:
-            raise HTTPException(status_code=400, detail="No audio or text provided.")
+            raise HTTPException(status_code=400, detail="No valid audio file or text transcript provided.")
 
         response = await client.aio.models.generate_content(
             model='gemini-2.5-flash',
@@ -547,12 +603,16 @@ async def voice_assistant(
 @router.post("/ai/analyze-notice")
 async def analyze_notice(file: UploadFile = File(...)):
     """
-    Analyzes an uploaded legal/official notice to classify and summarize it.
+    Resilient notice analyzer with security validation.
     """
     if not scanner_client:
         raise HTTPException(status_code=500, detail="Scanner client not initialized.")
     
-    api_limiter.check_limit()
+    validate_uploaded_file(
+        file,
+        allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
+        max_size_bytes=10 * 1024 * 1024  # 10MB limit
+    )
     
     try:
         file_bytes = await file.read()
@@ -583,13 +643,19 @@ async def analyze_notice(file: UploadFile = File(...)):
             contents=[prompt, doc_part],
             config=types.GenerateContentConfig(
                 temperature=0.1,
+                max_output_tokens=1500,  # Optimize speed by limiting output token length
                 response_mime_type="application/json",
                 response_schema=NoticeAnalysisSchema
             ),
         )
-        return {"analysis": response.text}
+        try:
+            parsed_analysis = json.loads(response.text)
+        except Exception:
+            parsed_analysis = response.text
+        return {"analysis": parsed_analysis}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/ai/chat-notice")
 async def chat_notice(
@@ -601,15 +667,22 @@ async def chat_notice(
     """
     if not client:
         raise HTTPException(status_code=500, detail="Gemini client not initialized.")
-    api_limiter.check_limit()
     
+    if not question or len(question) > 5000:
+        raise HTTPException(status_code=400, detail="question length must be between 1 and 5000 characters.")
+    sanitized_question = html.escape(question.strip())
+
+    if not notice_context or len(notice_context) > 100000:
+        raise HTTPException(status_code=400, detail="notice_context length must be between 1 and 100000 characters.")
+    sanitized_notice_context = html.escape(notice_context.strip())
+
     prompt = f"""
     You are an expert Legal Advisor AI. The user has uploaded an official/legal notice.
     Here is the AI-extracted context of that notice:
-    {notice_context}
+    {sanitized_notice_context}
 
     The user asks you this follow-up question about the notice:
-    {question}
+    {sanitized_question}
 
     Provide a clear, accurate, and practical answer. Explain legal terms simply. Outline any next steps if necessary. Keep your response in Markdown format.
     """
@@ -625,3 +698,4 @@ async def chat_notice(
         return {"reply": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Chat failed: {str(e)}")
+

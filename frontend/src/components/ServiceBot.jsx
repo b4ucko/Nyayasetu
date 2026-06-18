@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../supabase';
 import html2pdf from 'html2pdf.js';
+import ReactMarkdown from 'react-markdown';
 
 export default function ServiceBot({ externallyOpen = false, onExternalClose = null, initialContext = null, onStateChange = null, offset = 0 }) {
   const { user } = useAuth();
@@ -742,9 +743,15 @@ If you need any other help, type "menu" to choose another option.`;
                 msg.type === 'user' 
                   ? 'bg-govblue text-white rounded-br-sm shadow-md' 
                   : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm border border-slate-100 dark:border-slate-700'
-              } whitespace-pre-wrap`}
+              }`}
             >
-              {msg.text}
+              {msg.type === 'bot' ? (
+                <div className="prose prose-sm dark:prose-invert text-slate-800 dark:text-slate-200 max-w-none">
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap">{msg.text}</div>
+              )}
             </div>
           </div>
         ))}
