@@ -107,6 +107,7 @@ export default function NoticeChecker() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState(false);
+  const [validationError, setValidationError] = useState('');
   const [progress, setProgress] = useState(0);
 
   // Chat state
@@ -137,15 +138,16 @@ export default function NoticeChecker() {
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     
     if (!allowedExtensions.includes(fileExtension)) {
-      alert("Unsupported file type. Only PDF and images (.jpg, .jpeg, .png, .webp) are allowed.");
+      setValidationError("Unsupported file type. Only PDF and images (.jpg, .jpeg, .png, .webp) are allowed.");
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert("File exceeds maximum allowed size of 10MB.");
+      setValidationError("File exceeds maximum allowed size of 10MB.");
       return;
     }
 
+    setValidationError('');
     setAnalysisLoading(true);
     setAnalysisError(false);
     setAnalysisResult(null);
@@ -258,7 +260,10 @@ export default function NoticeChecker() {
               <input
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(e) => setFile(e.target.files[0])}
+                onChange={(e) => {
+                  setFile(e.target.files[0]);
+                  setValidationError('');
+                }}
                 className="flex-1 p-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm transition-colors file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-red-50 file:text-red-600 hover:file:bg-red-100 dark:file:bg-red-900/10 dark:file:text-red-400"
               />
               <button 
@@ -270,6 +275,16 @@ export default function NoticeChecker() {
               </button>
             </div>
           </form>
+
+          {validationError && (
+            <div className="bg-red-50 border border-red-200 p-6 rounded-2xl flex items-start space-x-4 shadow-sm dark:bg-red-900/20 dark:border-red-800">
+               <AlertCircle className="w-6 h-6 text-red-500 mt-0.5" />
+               <div>
+                 <h4 className="text-red-800 dark:text-red-400 font-bold mb-1">Validation Error</h4>
+                 <p className="text-red-700 dark:text-red-300 text-sm">{validationError}</p>
+               </div>
+            </div>
+          )}
 
           {analysisError && (
             <div className="bg-red-50 border border-red-200 p-6 rounded-2xl flex items-start space-x-4 shadow-sm dark:bg-red-900/20 dark:border-red-800">
