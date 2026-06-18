@@ -262,7 +262,17 @@ export function ProgressiveFluxLoader({
 
       // Get dynamic duration for the current phase based on its label length
       const label = currentPhase?.label ?? "";
-      const currentPhaseDuration = getLabelDuration(label);
+      let currentPhaseDuration = getLabelDuration(label);
+
+      const phaseAt = currentPhase ? currentPhase.at : 0;
+      const nextPhaseAt = nextPhase ? nextPhase.at : 100;
+
+      // Accelerate transitions if the target progress has jumped ahead, to avoid holding up the UI.
+      if (currentTarget >= 100) {
+        currentPhaseDuration = 120; // very fast catch-up
+      } else if (currentTarget > nextPhaseAt) {
+        currentPhaseDuration = Math.max(250, currentPhaseDuration * 0.25); // speed up to catch up
+      }
 
       const elapsed = now - currentStartT;
       let newIdx = idx;
@@ -287,9 +297,6 @@ export function ProgressiveFluxLoader({
       }
 
       // Calculate progress interpolation
-      const phaseAt = currentPhase ? currentPhase.at : 0;
-      const nextPhaseAt = nextPhase ? nextPhase.at : 100;
-
       const currentPhaseElapsed = now - newStartT;
       const fraction = Math.min(1, currentPhaseElapsed / currentPhaseDuration);
       

@@ -109,12 +109,30 @@ export default function NoticeChecker() {
   const [analysisError, setAnalysisError] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [progress, setProgress] = useState(0);
+  const [tempResult, setTempResult] = useState(null);
+  const [animationDone, setAnimationDone] = useState(false);
 
   // Chat state
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatContainerRef = useRef(null);
+
+  // Wait for both API response and animation to be complete before showing results
+  useEffect(() => {
+    if (tempResult && animationDone) {
+      setAnalysisResult(tempResult);
+      setMessages([
+        { 
+          role: 'system', 
+          content: `I've analyzed your ${tempResult.notice_type || 'notice'}. You can now ask me any specific questions about it, what it means, or what you should do next.` 
+        }
+      ]);
+      setAnalysisLoading(false);
+      setTempResult(null);
+      setAnimationDone(false);
+    }
+  }, [tempResult, animationDone]);
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
@@ -151,43 +169,73 @@ export default function NoticeChecker() {
     setAnalysisLoading(true);
     setAnalysisError(false);
     setAnalysisResult(null);
+    setTempResult(null);
+    setAnimationDone(false);
     setProgress(0);
     setMessages([]); // Reset chat when new file is uploaded
 
-    let currentProgress = 0;
-    const progressInterval = setInterval(() => {
-      if (currentProgress < 95) {
-        currentProgress += 1.5; // reaches 95% in about 6.3 seconds
+    // Phase 1: Preparing/compressing document (0% to 15%)
+    setProgress(5);
+    let currentProgress = 5;
+    
+    const compressionProgressInterval = setInterval(() => {
+      if (currentProgress < 15) {
+        currentProgress += 2;
         setProgress(currentProgress);
+      } else {
+        clearInterval(compressionProgressInterval);
       }
-    }, 100);
+    }, 50);
+
+    let progressInterval = null;
 
     try {
       // Compress the image before uploading to reduce network traffic
       const compressedFile = await compressImage(file);
+      clearInterval(compressionProgressInterval);
+      setProgress(15);
+      currentProgress = 15;
 
       const formData = new FormData();
       formData.append('file', compressedFile);
 
-      const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData);
+      // Phase 2: Uploading notice file (15% to 45%)
+      const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData, {
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            // map upload percent (0 to 100) to progress (15 to 45)
+            const uploadProgress = 15 + Math.round(uploadPercent * 0.30);
+            currentProgress = uploadProgress;
+            setProgress(uploadProgress);
+          }
+        }
+      });
       
+      // Ensure we hit 45% when upload completes
+      setProgress(45);
+      currentProgress = 45;
+
+      // Phase 3, 4, 5: Backend processing and AI analysis (45% to 95%)
+      // Run a smooth decelerating interval to show ongoing analysis
+      progressInterval = setInterval(() => {
+        const remaining = 95 - currentProgress;
+        const step = Math.max(0.5, remaining * 0.08); // Decelerates calmly as it approaches 95%
+        currentProgress = Math.min(95, currentProgress + step);
+        setProgress(currentProgress);
+      }, 200);
+
       // Direct JSON parsing from native backend dict (no regex string replacements)
       const cleanData = response.data.analysis;
       const parsedData = typeof cleanData === 'string' ? JSON.parse(cleanData) : cleanData;
 
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       setProgress(100);
-      setAnalysisResult(parsedData);
-      setMessages([
-        { 
-          role: 'system', 
-          content: `I've analyzed your ${parsedData.notice_type || 'notice'}. You can now ask me any specific questions about it, what it means, or what you should do next.` 
-        }
-      ]);
-      setAnalysisLoading(false);
+      setTempResult(parsedData);
     } catch (error) {
       console.error("Notice Analysis Error:", error);
-      clearInterval(progressInterval);
+      if (compressionProgressInterval) clearInterval(compressionProgressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       setAnalysisError(true);
       setAnalysisLoading(false);
     }
@@ -233,6 +281,7 @@ export default function NoticeChecker() {
             <ProgressiveFluxLoader 
               value={progress}
               phases={NOTICE_PHASES} 
+              onComplete={() => setAnimationDone(true)}
             />
           </motion.div>
         ) : (
