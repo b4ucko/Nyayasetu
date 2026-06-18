@@ -269,9 +269,9 @@ export function ProgressiveFluxLoader({
 
       // Accelerate transitions if the target progress has jumped ahead, to avoid holding up the UI.
       if (currentTarget >= 100) {
-        currentPhaseDuration = 120; // very fast catch-up
+        currentPhaseDuration = 20; // cascade almost instantly (100ms total)
       } else if (currentTarget > nextPhaseAt) {
-        currentPhaseDuration = Math.max(250, currentPhaseDuration * 0.25); // speed up to catch up
+        currentPhaseDuration = Math.max(150, currentPhaseDuration * 0.15); // speed up to catch up
       }
 
       const elapsed = now - currentStartT;
@@ -391,7 +391,7 @@ export function ProgressiveFluxLoader({
           transition={
             reduced
               ? { duration: 0 }
-              : { duration: 0.55, ease: [0.22, 1, 0.36, 1] }
+              : { duration: target >= 100 ? 0.15 : 0.55, ease: [0.22, 1, 0.36, 1] }
           }
         >
           {!reduced && (

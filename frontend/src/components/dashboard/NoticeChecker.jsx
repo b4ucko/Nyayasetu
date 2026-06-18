@@ -176,69 +176,73 @@ export default function NoticeChecker() {
 
     // Phase 1: Preparing/compressing document (0% to 15%)
     setProgress(5);
-    let currentProgress = 5;
-    
-    const compressionProgressInterval = setInterval(() => {
-      if (currentProgress < 15) {
-        currentProgress += 2;
-        setProgress(currentProgress);
-      } else {
-        clearInterval(compressionProgressInterval);
-      }
-    }, 50);
 
-    let progressInterval = null;
-
-    try {
-      // Compress the image before uploading to reduce network traffic
-      const compressedFile = await compressImage(file);
-      clearInterval(compressionProgressInterval);
-      setProgress(15);
-      currentProgress = 15;
-
-      const formData = new FormData();
-      formData.append('file', compressedFile);
-
-      // Phase 2: Uploading notice file (15% to 45%)
-      const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData, {
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            // map upload percent (0 to 100) to progress (15 to 45)
-            const uploadProgress = 15 + Math.round(uploadPercent * 0.30);
-            currentProgress = uploadProgress;
-            setProgress(uploadProgress);
-          }
-        }
-      });
+    // Yield control to the browser's main thread so React has time to render the loader UI and run animations
+    setTimeout(async () => {
+      let currentProgress = 5;
       
-      // Ensure we hit 45% when upload completes
-      setProgress(45);
-      currentProgress = 45;
+      const compressionProgressInterval = setInterval(() => {
+        if (currentProgress < 15) {
+          currentProgress += 2;
+          setProgress(currentProgress);
+        } else {
+          clearInterval(compressionProgressInterval);
+        }
+      }, 50);
 
-      // Phase 3, 4, 5: Backend processing and AI analysis (45% to 95%)
-      // Run a smooth decelerating interval to show ongoing analysis
-      progressInterval = setInterval(() => {
-        const remaining = 95 - currentProgress;
-        const step = Math.max(0.5, remaining * 0.08); // Decelerates calmly as it approaches 95%
-        currentProgress = Math.min(95, currentProgress + step);
-        setProgress(currentProgress);
-      }, 200);
+      let progressInterval = null;
 
-      // Direct JSON parsing from native backend dict (no regex string replacements)
-      const cleanData = response.data.analysis;
-      const parsedData = typeof cleanData === 'string' ? JSON.parse(cleanData) : cleanData;
+      try {
+        // Compress the image before uploading to reduce network traffic
+        const compressedFile = await compressImage(file);
+        clearInterval(compressionProgressInterval);
+        setProgress(15);
+        currentProgress = 15;
 
-      if (progressInterval) clearInterval(progressInterval);
-      setProgress(100);
-      setTempResult(parsedData);
-    } catch (error) {
-      console.error("Notice Analysis Error:", error);
-      if (compressionProgressInterval) clearInterval(compressionProgressInterval);
-      if (progressInterval) clearInterval(progressInterval);
-      setAnalysisError(true);
-      setAnalysisLoading(false);
-    }
+        const formData = new FormData();
+        formData.append('file', compressedFile);
+
+        // Phase 2: Uploading notice file (15% to 45%)
+        const response = await axios.post('http://localhost:8000/api/ai/analyze-notice', formData, {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              // map upload percent (0 to 100) to progress (15 to 45)
+              const uploadProgress = 15 + Math.round(uploadPercent * 0.30);
+              currentProgress = uploadProgress;
+              setProgress(uploadProgress);
+            }
+          }
+        });
+        
+        // Ensure we hit 45% when upload completes
+        setProgress(45);
+        currentProgress = 45;
+
+        // Phase 3, 4, 5: Backend processing and AI analysis (45% to 95%)
+        // Run a smooth decelerating interval to show ongoing analysis
+        progressInterval = setInterval(() => {
+          const remaining = 95 - currentProgress;
+          const step = Math.max(0.5, remaining * 0.08); // Decelerates calmly as it approaches 95%
+          currentProgress = Math.min(95, currentProgress + step);
+          setProgress(currentProgress);
+        }, 200);
+
+        // Direct JSON parsing from native backend dict (no regex string replacements)
+        const cleanData = response.data.analysis;
+        const parsedData = typeof cleanData === 'string' ? JSON.parse(cleanData) : cleanData;
+
+        if (progressInterval) clearInterval(progressInterval);
+        setProgress(100);
+        setTempResult(parsedData);
+      } catch (error) {
+        console.error("Notice Analysis Error:", error);
+        if (compressionProgressInterval) clearInterval(compressionProgressInterval);
+        if (progressInterval) clearInterval(progressInterval);
+        setAnalysisError(true);
+        setAnalysisLoading(false);
+      }
+    }, 100);
   };
 
   const handleChatSubmit = async (e) => {
