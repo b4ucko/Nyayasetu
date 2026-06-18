@@ -15,11 +15,16 @@ const NOTICE_PHASES = [
 
 const ExpandableText = ({ text, className }) => {
   const [expanded, setExpanded] = useState(false);
-  const isLong = text && text.length > 60;
+  const safeText = typeof text === 'string' ? text : '';
+  const isLong = safeText.length > 80;
+  
+  const displayText = expanded ? safeText : (isLong ? safeText.slice(0, 80) + '...' : safeText);
   
   return (
-    <div>
-       <div className={`${className} ${expanded ? '' : 'line-clamp-1'}`}>{text}</div>
+    <div className={className}>
+       <div className="prose prose-sm dark:prose-invert max-w-none text-current">
+         <ReactMarkdown>{displayText}</ReactMarkdown>
+       </div>
        {isLong && (
           <button 
              onClick={() => setExpanded(!expanded)} 
