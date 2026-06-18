@@ -113,6 +113,7 @@ class UserProfile(BaseModel):
     education: str = Field(default="", max_length=100)
     filterCategory: str = Field(default="", max_length=100)
     filterState: str = Field(default="", max_length=100)
+    page: int = Field(default=1, ge=1)
 
     @field_validator(
         "name", "occupation", "state", "gender", "marital_status",
@@ -149,6 +150,7 @@ class RecommendationSchema(BaseModel):
 
 class RecommendationsList(BaseModel):
     schemes: list[RecommendationSchema]
+    has_more: bool = False
 
 class NoticeAnalysisSchema(BaseModel):
     notice_type: str
@@ -181,6 +183,7 @@ async def match_schemes(profile: UserProfile):
 
     # 2. RAG Context Generation (Query Chroma database)
     schemes_context = ""
+    has_more = False
     try:
         from rag_pipeline.rag import GeminiEmbeddings, DB_DIR
         from langchain_community.vectorstores import Chroma
@@ -190,9 +193,25 @@ async def match_schemes(profile: UserProfile):
         if embeddings.client and embeddings.client.api_key:
             vectorstore = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
             search_query = f"Government schemes for state {profile.state}, age {profile.age}, occupation {profile.occupation}, category {profile.filterCategory or 'all'}, gender {profile.gender or 'all'}"
-            matching_docs = vectorstore.similarity_search(search_query, k=12)
+            matching_docs = vectorstore.similarity_search(search_query, k=40)
             
+            # De-duplicate documents
+            seen = set()
+            unique_docs = []
             for doc in matching_docs:
+                name = doc.metadata.get('name')
+                if name and name not in seen:
+                    seen.add(name)
+                    unique_docs.append(doc)
+            
+            PAGE_SIZE = 10
+            start_idx = (profile.page - 1) * PAGE_SIZE
+            end_idx = start_idx + PAGE_SIZE
+            
+            sliced_docs = unique_docs[start_idx:end_idx]
+            has_more = end_idx < len(unique_docs)
+            
+            for doc in sliced_docs:
                 schemes_context += f"---\n{doc.page_content}\nMetadata: {json.dumps(doc.metadata)}\n"
     except Exception as e:
         print(f"Warning: Chroma vector DB search failed ({e}). Falling back to local dataset file.")
@@ -219,7 +238,14 @@ async def match_schemes(profile: UserProfile):
                 
                 target_schemes = filtered_local if filtered_local else local_schemes
                 
-                for s in target_schemes:
+                PAGE_SIZE = 10
+                start_idx = (profile.page - 1) * PAGE_SIZE
+                end_idx = start_idx + PAGE_SIZE
+                
+                sliced_schemes = target_schemes[start_idx:end_idx]
+                has_more = end_idx < len(target_schemes)
+                
+                for s in sliced_schemes:
                     schemes_context += (
                         f"---\n"
                         f"Scheme Name: {s.get('scheme_name')}\n"
@@ -251,7 +277,7 @@ async def match_schemes(profile: UserProfile):
     State: {profile.state}
     Land Holding: {profile.land_acres} acres
 
-    Context - Candidate Schemes:
+    Context - Candidate Schemes (Page {profile.page}):
     {schemes_context}
 
     CRITICAL RULES:
@@ -279,6 +305,10 @@ async def match_schemes(profile: UserProfile):
         )
         data = json.loads(response.text)
         
+        # Inject python-computed has_more flag
+        if isinstance(data, dict):
+            data["has_more"] = has_more
+        
         # Save to memory cache
         if profile_hash and data:
             MATCHES_CACHE[profile_hash] = data
@@ -287,7 +317,7 @@ async def match_schemes(profile: UserProfile):
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="AI Recommendation request timed out. Trying next fallback key.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Recommendation failed: {str(e)}")")
+        raise HTTPException(status_code=500, detail=f"AI Recommendation failed: {str(e)}")
 
 
 @router.get("/ai/scheme/{scheme_name}")

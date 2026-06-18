@@ -27,6 +27,8 @@ export default function SchemeMatcher() {
   const [tempSchemes, setTempSchemes] = useState(null);
   const [animationDone, setAnimationDone] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   // Hardcoded for prototype; ideally derived dynamically or fetched from backend
   const availableStates = ['All', 'Maharashtra', 'Karnataka', 'Delhi', 'Gujarat', 'Uttar Pradesh'];
@@ -61,7 +63,49 @@ export default function SchemeMatcher() {
     }
   }, [tempSchemes, animationDone, user]);
 
-  const matchSchemes = async () => {
+  // Background prefetching hook
+  useEffect(() => {
+    if (loading || !hasMore || !user) return;
+
+    const prefetchNextPage = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        let profileData = data || { age: 'unknown', occupation: 'unknown', state: 'unknown' };
+
+        const payload = {
+          name: profileData.name || "Citizen",
+          age: Number(profileData.age) || 30,
+          occupation: profileData.occupation || "Unemployed",
+          income: Number(profileData.income) || 0,
+          state: profileData.state || "Maharashtra",
+          land_acres: 0,
+          gender: profileData.gender || "",
+          marital_status: profileData.marital_status || "",
+          caste: profileData.caste || "",
+          disability: profileData.disability || "No",
+          education: profileData.education || "",
+          filterState: filterState !== 'All' ? filterState : "",
+          filterCategory: filterCategory !== 'All' ? filterCategory : "",
+          page: currentPage + 1
+        };
+
+        console.log(`Prefetching page ${currentPage + 1} in the background...`);
+        await axios.post('http://localhost:8000/api/ai/match', payload, { timeout: 120000 });
+        console.log(`Page ${currentPage + 1} prefetched and cached successfully.`);
+      } catch (err) {
+        console.warn("Background prefetch failed:", err);
+      }
+    };
+
+    prefetchNextPage();
+  }, [schemes, currentPage, hasMore, user, filterState, filterCategory, loading]);
+
+  const matchSchemes = async (targetPage = 1) => {
     if (!user) {
       alert("Please log in to match schemes.");
       navigate('/login');
@@ -72,6 +116,7 @@ export default function SchemeMatcher() {
     setProgress(0);
     setTempSchemes(null);
     setAnimationDone(false);
+    setCurrentPage(targetPage);
 
     // Yield control to the browser thread so the loader displays immediately without startup lag
     setTimeout(async () => {
@@ -114,7 +159,8 @@ export default function SchemeMatcher() {
           disability: profileData.disability || "No",
           education: profileData.education || "",
           filterState: filterState !== 'All' ? filterState : "",
-          filterCategory: filterCategory !== 'All' ? filterCategory : ""
+          filterCategory: filterCategory !== 'All' ? filterCategory : "",
+          page: targetPage
         };
 
         // 2. Call backend with real profile
@@ -129,6 +175,7 @@ export default function SchemeMatcher() {
         clearInterval(progressInterval);
         setProgress(100);
         setTempSchemes(processedSchemes);
+        setHasMore(!!response.data.has_more);
         setErrorMsg('');
       } catch (error) {
         console.error("Error matching schemes:", error);
@@ -141,6 +188,7 @@ export default function SchemeMatcher() {
         clearInterval(progressInterval);
         setProgress(100);
         setTempSchemes(fallbackSchemes);
+        setHasMore(false);
       }
     }, 100);
   };
@@ -184,7 +232,7 @@ export default function SchemeMatcher() {
               <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight transition-colors">AI Scheme Matcher</h2>
               <p className="text-slate-650 dark:text-slate-400 mt-1 transition-colors">Discover personalized benefits powered by our Glorious AI</p>
             </div>
-            <button onClick={matchSchemes} disabled={loading} className="bg-gradient-to-r from-govorange to-orange-500 text-white font-bold px-6 py-3 rounded-xl hover:scale-105 shadow-md shadow-orange-500/30 transition auto disabled:opacity-50">
+            <button onClick={() => matchSchemes(1)} disabled={loading} className="bg-gradient-to-r from-govorange to-orange-500 text-white font-bold px-6 py-3 rounded-xl hover:scale-105 shadow-md shadow-orange-500/30 transition auto disabled:opacity-50">
               Find Matches
             </button>
           </div>
@@ -209,8 +257,8 @@ export default function SchemeMatcher() {
                 {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 ml-auto font-medium transition-colors">
-              Showing {filteredSchemes.length} of {schemes.length} schemes
+            <div className="text-xs text-slate-500 dark:text-slate-400 ml-auto font-bold transition-colors">
+              Showing Page {currentPage}
             </div>
           </div>
 
@@ -255,6 +303,31 @@ export default function SchemeMatcher() {
               </div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {schemes.length > 0 && (
+            <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-6 mt-6 flex-wrap gap-4">
+              <button
+                onClick={() => matchSchemes(currentPage - 1)}
+                disabled={currentPage === 1 || loading}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 transition shadow-sm"
+              >
+                &larr; Previous Page
+              </button>
+              
+              <div className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                Page <span className="text-slate-800 dark:text-white font-extrabold">{currentPage}</span>
+              </div>
+              
+              <button
+                onClick={() => matchSchemes(currentPage + 1)}
+                disabled={!hasMore || loading}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 transition shadow-sm"
+              >
+                Next Page &rarr;
+              </button>
+            </div>
+          )}
           </motion.div>
         )}
       </AnimatePresence>
