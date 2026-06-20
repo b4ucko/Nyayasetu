@@ -32,23 +32,7 @@ export default function SchemeMatcher() {
 
   // Hardcoded for prototype; ideally derived dynamically or fetched from backend
   const availableStates = ['All', 'Maharashtra', 'Karnataka', 'Delhi', 'Gujarat', 'Uttar Pradesh'];
-  const availableCategories = ['All', 'Agriculture', 'Health', 'Education', 'Housing', 'Finance'];
-
-  useEffect(() => {
-    if (user) {
-      const cached = localStorage.getItem(`omnigov_schemes_${user.id}`);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-             setSchemes(parsed);
-          }
-        } catch (e) {
-          console.error("Cache parse error", e);
-        }
-      }
-    }
-  }, [user]);
+  const availableCategories = ['All', 'Agriculture', 'Healthcare', 'Education', 'Housing', 'Finance', 'Employment', 'Business', 'Pension', 'Social Welfare'];
 
   // Wait for both API response and animation to be complete before showing results
   useEffect(() => {
@@ -193,10 +177,47 @@ export default function SchemeMatcher() {
     }, 100);
   };
 
+  // Load cached schemes on mount, or auto-trigger match if empty
+  useEffect(() => {
+    if (user) {
+      const cached = localStorage.getItem(`omnigov_schemes_${user.id}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+             setSchemes(parsed);
+             return;
+          }
+        } catch (e) {
+          console.error("Cache parse error", e);
+        }
+      }
+      // Auto-run matcher on initial load if no cache exists
+      matchSchemes(1);
+    }
+  }, [user]);
+
   const filteredSchemes = useMemo(() => {
     return (schemes || []).filter(scheme => {
-      const matchState = filterState === 'All' || scheme.stateApplicability === 'All' || scheme.stateApplicability === filterState;
-      const matchCategory = filterCategory === 'All' || scheme.category === filterCategory;
+      const sState = (scheme.stateApplicability || '').trim().toLowerCase();
+      const fState = filterState.trim().toLowerCase();
+      
+      const matchState = 
+        fState === 'all' || 
+        sState === 'all' || 
+        sState === 'all india' || 
+        sState === fState;
+      
+      const sCategory = (scheme.category || '').trim().toLowerCase();
+      const fCategory = filterCategory.trim().toLowerCase();
+      
+      const matchCategory = 
+        fCategory === 'all' || 
+        sCategory === fCategory ||
+        (fCategory === 'health' && sCategory.includes('health')) ||
+        (fCategory === 'healthcare' && sCategory.includes('health')) ||
+        sCategory.includes(fCategory);
+        
       return matchState && matchCategory;
     });
   }, [schemes, filterState, filterCategory]);
