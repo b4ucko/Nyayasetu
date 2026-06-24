@@ -14,9 +14,9 @@ function Footer() {
           {/* Column 1: Brand & About */}
           <div className="col-span-1 md:col-span-1 lg:col-span-2">
             <Link to="/" className="flex items-center space-x-3 group inline-block mb-6">
-              <img src="/logo.png" alt="Omni-Gov Logo" className="w-8 h-8 object-contain transform transition-transform hover:-translate-y-1 hover:rotate-6 duration-300" />
+              <img src="/logo.png" alt="Nyayasetu Logo" className="w-8 h-8 object-contain transform transition-transform hover:-translate-y-1 hover:rotate-6 duration-300" />
               <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">
-                Omni-Gov <span className="bg-gradient-to-r from-govblue to-govorange text-transparent bg-clip-text">Advocate</span>
+                Nyayasetu
               </h2>
             </Link>
             <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md leading-relaxed text-sm md:text-base">
@@ -86,7 +86,7 @@ function Footer() {
         {/* Bottom Bar */}
         <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center text-sm font-medium text-slate-500 dark:text-slate-400">
-            &copy; {new Date().getFullYear()} Omni-Gov Advocate. All rights reserved.
+            &copy; {new Date().getFullYear()} Nyayasetu. All rights reserved.
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-slate-500 dark:text-slate-400">
             <Link to="/help-center" className="hover:text-govblue dark:hover:text-blue-400 transition-colors duration-200">Help Center</Link>
