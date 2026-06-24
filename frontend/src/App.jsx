@@ -123,7 +123,7 @@ function Navigation({ theme, toggleTheme }) {
         <Link to="/" className="flex items-center space-x-3 group">
           <img src="/logo.png" alt="Nyayasetu Logo" className="w-8 h-8 object-contain transform transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300" />
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight transition-colors">
-            Nyayasetu <span className="bg-gradient-to-r from-govblue to-govorange text-gradient">Advocate</span>
+            Nyayasetu
           </h1>
         </Link>
         <div className="hidden md:flex space-x-6 items-center">
