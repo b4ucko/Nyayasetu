@@ -21,7 +21,7 @@ const essentialDocuments = [
 const integratedPlatforms = [
   { type: 'platform', id: 'edistrict', name: 'e-District Services', icon: FileText, desc: 'Offers online applications for various certificates, licenses, and registrations with document uploads and tracking.' },
   { type: 'platform', id: 'myscheme', name: 'myScheme Portal', icon: Sparkles, desc: 'Search, discover, and apply for government schemes via a 3-step process covering education, health, and more.' },
-  { type: 'platform', id: 'digilocker', name: 'DigiLocker', icon: ShieldCheck, desc: 'Secure digital wallet for storing and sharing authentic government-issued documents that are legally recognized.' },
+  { type: 'platform', id: 'vault', name: 'Secure Document Vault', icon: ShieldCheck, desc: 'A local-first, highly secure digital vault to upload and store your crucial certificates and identity cards locally, fully protected.' },
   { type: 'platform', id: 'umang', name: 'UMANG / Unified Portal', icon: Users, desc: 'Provides end-to-end online access to government services with seamless cross-department database integration.' }
 ];
 

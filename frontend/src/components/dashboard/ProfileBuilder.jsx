@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { AlertCircle, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building, UserCircle } from 'lucide-react';
+import { AlertCircle, FileUp, Sparkles, ShieldCheck, CreditCard, Calendar, Building, UserCircle, Trash2, Eye, Plus, Lock, Download, FolderCheck } from 'lucide-react';
 import axios from 'axios';
 import { ProgressiveFluxLoader } from '../ui/progressive-flux-loader';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,22 +20,60 @@ export default function ProfileBuilder() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState({});
-  const [loadingDigilocker, setLoadingDigilocker] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [verifiedIdDetails, setVerifiedIdDetails] = useState(null);
-  const isDigilockerVerified = user?.user_metadata?.digilocker_verified === true;
-  const [docsList, setDocsList] = useState([
-     { id: 1, name: "PAN Verification Record", issuer: "Income Tax Department", status: "pending", date: "N/A" },
-     { id: 2, name: "Driving License", issuer: "Ministry of Road Transport", status: "pending", date: "N/A" },
-     { id: 3, name: "Class XII Marksheet", issuer: "CBSE", status: "pending", date: "N/A" },
-  ]);
+
+  // Secure Document Vault States
+  const [vaultDocs, setVaultDocs] = useState([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [newDocName, setNewDocName] = useState('');
+  const [newDocType, setNewDocType] = useState('');
+  const [newDocFile, setNewDocFile] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
 
   // States to delay display until animation finishes
   const [tempProfile, setTempProfile] = useState(null);
   const [tempVerifiedIdDetails, setTempVerifiedIdDetails] = useState(null);
   const [extractingDone, setExtractingDone] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
+
+  // Load vault documents keyed by unique Supabase User UID
+  useEffect(() => {
+    if (user) {
+      const stored = localStorage.getItem(`nyayasetu_vault_${user.id}`);
+      if (stored) {
+        try {
+          setVaultDocs(JSON.parse(stored));
+        } catch (e) {
+          console.error("Error parsing vault documents:", e);
+        }
+      } else {
+        setVaultDocs([]);
+      }
+    } else {
+      setVaultDocs([]);
+    }
+  }, [user]);
+
+  const saveVaultDocs = (docs) => {
+    if (user) {
+      localStorage.setItem(`nyayasetu_vault_${user.id}`, JSON.stringify(docs));
+      setVaultDocs(docs);
+    }
+  };
+
+  const base64ToBlob = (base64Data, contentType) => {
+    const parts = base64Data.split(',');
+    const byteCharacters = atob(parts[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType });
+  };
 
   // Wait for both OCR API response and animation to be complete before filling form
   useEffect(() => {
@@ -53,46 +91,7 @@ export default function ProfileBuilder() {
     }
   }, [tempProfile, tempVerifiedIdDetails, extractingDone]);
 
-  const handleDigilockerVerify = async () => {
-    setLoadingDigilocker(true);
-    try {
-      const resp = await axios.post("http://localhost:8000/api/digilocker/init", {
-        redirectUrl: window.location.origin + "/callback"
-      });
-      if (resp.data.url) {
-        window.location.href = resp.data.url;
-      } else {
-        alert("Failed to initiate DigiLocker session.");
-        setLoadingDigilocker(false);
-      }
-    } catch (error) {
-       console.error("DigiLocker init error:", error);
-       const errorMsg = error.response?.data?.detail || "Error initiating DigiLocker session.";
-       alert(errorMsg);
-       setLoadingDigilocker(false);
-     }
-  };
-
-  const handleFetchRealDoc = async (docId, docName) => {
-    setDocsList(docs => docs.map(d => d.id === docId ? { ...d, status: "fetching", error: null } : d));
-    try {
-      const docTypeMap = {
-        "PAN Verification Record": "pan",
-        "Driving License": "driving_license",
-        "Class XII Marksheet": "class_xii"
-      };
-      const type = docTypeMap[docName] || "unknown";
-      const resp = await axios.get(`http://localhost:8000/api/digilocker/document/${user?.user_metadata?.digilocker_id}/${type}`);
-      
-      setDocsList(docs => docs.map(d => d.id === docId ? { ...d, status: "fetched", date: new Date().toLocaleDateString(), data: resp.data } : d));
-    } catch (err) {
-      console.error(err);
-      setDocsList(docs => docs.map(d => d.id === docId ? { ...d, status: "error", error: err.response?.data?.detail || err.message } : d));
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
+  const triggerOCRAuditing = async (file) => {
     if (!file) return;
 
     setExtracting(true);
@@ -158,8 +157,75 @@ export default function ProfileBuilder() {
       alert("Failed to extract details from the ID. Please fill manually.");
       didFail = true;
       apiDone = true;
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      await triggerOCRAuditing(file);
     } finally {
       e.target.value = null;
+    }
+  };
+
+  const handleAddToVault = async (e) => {
+    e.preventDefault();
+    if (!newDocFile || !newDocName || !newDocType) {
+      alert("Please fill in all fields and select a file.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Data = reader.result;
+      const formattedSize = (newDocFile.size / (1024 * 1024)).toFixed(2) + " MB";
+      const newDoc = {
+        id: Date.now().toString(),
+        name: newDocName,
+        type: newDocType,
+        fileName: newDocFile.name,
+        fileType: newDocFile.type,
+        fileData: base64Data,
+        fileSize: formattedSize,
+        uploadedAt: new Date().toLocaleDateString()
+      };
+
+      const updatedDocs = [...vaultDocs, newDoc];
+      saveVaultDocs(updatedDocs);
+      
+      // Reset form
+      setNewDocName('');
+      setNewDocType('');
+      setNewDocFile(null);
+      setShowUploadModal(false);
+      setUploadingDoc(false);
+      alert("Document successfully stored in your secure vault!");
+    };
+    reader.onerror = () => {
+      alert("Failed to read document file.");
+      setUploadingDoc(false);
+    };
+    reader.readAsDataURL(newDocFile);
+  };
+
+  const handleDeleteFromVault = (docId) => {
+    if (window.confirm("Are you sure you want to permanently delete this document from your secure vault?")) {
+      const updatedDocs = vaultDocs.filter(d => d.id !== docId);
+      saveVaultDocs(updatedDocs);
+    }
+  };
+
+  const handleAutofillFromVault = async (doc) => {
+    try {
+      const blob = base64ToBlob(doc.fileData, doc.fileType);
+      const file = new File([blob], doc.fileName, { type: doc.fileType });
+      await triggerOCRAuditing(file);
+    } catch (error) {
+      console.error("Error using vault doc for autofill:", error);
+      alert("Failed to process document for autofill.");
     }
   };
 
@@ -292,75 +358,86 @@ export default function ProfileBuilder() {
           )}
 
           <div className="grid grid-cols-1 gap-6 mb-2 text-sm">
-          {/* DIGILOCKER SECTION */}
-          {!isDigilockerVerified ? (
-            <div className="h-full bg-blue-50 dark:bg-slate-900 border border-blue-100 dark:border-slate-700 p-4 rounded-xl flex flex-col justify-center items-center text-center sm:text-left sm:flex-row sm:justify-between gap-4">
+          {/* SECURE DOCUMENT VAULT SECTION */}
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 p-6 rounded-2xl flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 dark:border-slate-800 pb-4">
               <div>
-                <h3 className="font-bold text-slate-800 dark:text-white flex items-center">
-                   <span className="text-xl mr-2">🔒</span> Verify with DigiLocker
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center">
+                   <Lock className="w-5 h-5 mr-2 text-govorange" /> Secure Document Vault
                 </h3>
-                <p className="text-sm text-slate-650 dark:text-slate-400 mt-1">Instantly fetch your Aadhaar details securely via Setu Sandbox.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Upload and store your identity cards, certificates, and documents locally. All data is securely locked to your UID: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-govblue dark:text-blue-400">{user?.id?.slice(0, 8)}...</span>
+                </p>
               </div>
               <button 
-                onClick={handleDigilockerVerify} 
-                disabled={loadingDigilocker}
+                onClick={() => setShowUploadModal(true)} 
                 type="button"
-                className="bg-govorange text-white px-5 py-2.5 rounded-xl font-bold hover:bg-orange-600 shadow-md transition-all hover:shadow-lg disabled:opacity-50 whitespace-nowrap"
+                className="bg-govblue text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-md transition-all hover:shadow-lg flex items-center text-xs whitespace-nowrap"
               >
-                {loadingDigilocker ? 'Redirecting...' : 'Verify Now'}
+                <Plus className="w-4 h-4 mr-1.5" /> Upload to Vault
               </button>
             </div>
-          ) : (
-            <div className="h-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-xl flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center space-x-2">
-                    <span className="text-2xl">✅</span>
-                    <div>
-                       <h3 className="font-bold text-green-800 dark:text-green-300">DigiLocker Verified</h3>
-                       <p className="text-sm text-green-700 dark:text-green-400">Linked to {user?.email}</p>
+
+            {/* Document Listing */}
+            {vaultDocs.length === 0 ? (
+              <div className="py-8 text-center bg-white/50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-6">
+                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                  <FolderCheck className="w-6 h-6 text-slate-400" />
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 font-semibold">Your Secure Document Vault is empty</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Upload your Aadhaar, PAN, or Educational certificates to store them safely.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vaultDocs.map(doc => (
+                  <div key={doc.id} className="flex items-start justify-between bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-755 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-slate-700 flex items-center justify-center shrink-0 text-xl font-bold text-govblue dark:text-govorange shadow-inner">
+                        {doc.type === 'Aadhaar' || doc.type === 'PAN Card' || doc.type === 'Driving License' ? '🪪' : '📄'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-white text-sm leading-tight">{doc.name}</h4>
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-[10px] font-bold rounded">
+                          {doc.type}
+                        </span>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {doc.fileSize} • {doc.uploadedAt}
+                        </p>
+                      </div>
                     </div>
-                 </div>
-                 <span className="px-3 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs font-bold rounded-full">ACTIVE</span>
+                    
+                    {/* Action buttons */}
+                    <div className="flex items-center space-x-1.5 shrink-0">
+                      <button 
+                        onClick={() => setViewingDoc(doc)}
+                        title="View Document"
+                        type="button" 
+                        className="p-1.5 bg-slate-50 hover:bg-blue-50 dark:bg-slate-900 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-govblue rounded-lg border dark:border-slate-700 transition"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleAutofillFromVault(doc)}
+                        title="Autofill Profile with AI"
+                        type="button" 
+                        className="p-1.5 bg-slate-50 hover:bg-amber-50 dark:bg-slate-900 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-govorange rounded-lg border dark:border-slate-700 transition"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteFromVault(doc.id)}
+                        title="Delete Document"
+                        type="button" 
+                        className="p-1.5 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 rounded-lg border dark:border-slate-700 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800">
-                 <h4 className="font-bold text-slate-800 dark:text-white mb-3 text-sm uppercase tracking-wider">Issued Documents Available to Fetch</h4>
-                 <div className="space-y-3">
-                   {docsList.map(doc => (
-                     <div key={doc.id} className="flex flex-col sm:flex-row sm:items-start justify-between bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 gap-3">
-                        <div className="flex items-center space-x-3">
-                           <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-slate-700 flex items-center justify-center text-xl shrink-0">📄</div>
-                           <div>
-                              <p className="font-bold text-slate-800 dark:text-white text-sm">{doc.name}</p>
-                              <p className="text-xs text-slate-500 mb-1">{doc.issuer}</p>
-                              {doc.status === 'error' && (
-                                <p className="text-xs text-red-500 font-medium break-all max-w-sm">{doc.error}</p>
-                              )}
-                           </div>
-                        </div>
-                        <div className="shrink-0 mt-2 sm:mt-0">
-                           {doc.status === 'pending' && (
-                             <button onClick={() => handleFetchRealDoc(doc.id, doc.name)} type="button" className="text-xs w-full sm:w-auto bg-govblue text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition">Fetch from DigiLocker</button>
-                           )}
-                           {doc.status === 'error' && (
-                             <button onClick={() => handleFetchRealDoc(doc.id, doc.name)} type="button" className="text-xs w-full sm:w-auto bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 transition">Retry Fetch</button>
-                           )}
-                           {doc.status === 'fetching' && (
-                             <p className="text-xs font-bold text-govorange animate-pulse px-4 py-2">Fetching API...</p>
-                           )}
-                           {doc.status === 'fetched' && (
-                             <div className="flex items-center space-x-2 text-xs">
-                               <span className="text-green-600 dark:text-green-400 font-bold flex items-center"><span className="mr-1">✓</span> Fetched {doc.date}</span>
-                               <button type="button" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600">View</button>
-                             </div>
-                           )}
-                        </div>
-                     </div>
-                   ))}
-                 </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
           </div>
 
@@ -617,6 +694,133 @@ export default function ProfileBuilder() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* UPLOAD TO VAULT MODAL */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/75 backdrop-blur-sm p-4 animate-fade-in">
+          <form onSubmit={handleAddToVault} className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-4 text-left">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center">
+              <Lock className="w-5 h-5 mr-2 text-govorange" /> Add Document to Vault
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select a document to store locally. All processing is run locally on your device.
+            </p>
+            
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1">Document Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. My Aadhaar Card" 
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-govblue"
+                  value={newDocName}
+                  onChange={(e) => setNewDocName(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1">Document Type</label>
+                <select 
+                  required
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-govblue"
+                  value={newDocType}
+                  onChange={(e) => setNewDocType(e.target.value)}
+                >
+                  <option value="">Select Type</option>
+                  <option value="Aadhaar">Aadhaar Card</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="Marksheet / Certificate">Marksheet / Certificate</option>
+                  <option value="Income Certificate">Income Certificate</option>
+                  <option value="Caste Certificate">Caste Certificate</option>
+                  <option value="Other">Other Document</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1">Select File</label>
+                <input 
+                  type="file" 
+                  required
+                  accept="image/*,.pdf"
+                  className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-govblue/10 file:text-govblue hover:file:bg-govblue/20"
+                  onChange={(e) => setNewDocFile(e.target.files[0])}
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 pt-3">
+              <button 
+                type="submit" 
+                disabled={uploadingDoc}
+                className="flex-1 bg-govblue text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 text-sm shadow-md"
+              >
+                {uploadingDoc ? 'Saving...' : 'Save to Vault'}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setShowUploadModal(false); setNewDocName(''); setNewDocType(''); setNewDocFile(null); }}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* VIEWING VAULT DOCUMENT PREVIEW OVERLAY */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-150 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center space-x-3">
+                <div className="text-2xl">🔒</div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">{viewingDoc.name}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-450">{viewingDoc.type} • {viewingDoc.fileSize} • Uploaded {viewingDoc.uploadedAt}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingDoc(null)}
+                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-455 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2055/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 flex justify-center items-center bg-slate-50 dark:bg-slate-950/50 min-h-[300px]">
+              {viewingDoc.fileType.startsWith('image/') ? (
+                <img src={viewingDoc.fileData} className="max-h-[60vh] object-contain rounded-xl shadow-lg border border-slate-200/50" alt={viewingDoc.name} />
+              ) : viewingDoc.fileType === 'application/pdf' ? (
+                <iframe src={viewingDoc.fileData} className="w-full h-[60vh] rounded-xl border border-slate-250 dark:border-slate-800" title={viewingDoc.name}></iframe>
+              ) : (
+                <div className="text-center p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm max-w-md">
+                  <p className="text-slate-700 dark:text-slate-300 font-bold mb-4">Preview not available for this file type.</p>
+                  <a href={viewingDoc.fileData} download={viewingDoc.fileName} className="inline-flex items-center bg-govblue text-white font-bold px-6 py-2.5 rounded-xl hover:bg-blue-750 transition">
+                    <Download className="w-4 h-4 mr-2" /> Download File
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end space-x-3">
+              <a href={viewingDoc.fileData} download={viewingDoc.fileName} className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 border dark:border-slate-700 transition flex items-center">
+                <Download className="w-4.5 h-4.5 mr-2 text-slate-500" /> Download
+              </a>
+              <button onClick={() => { handleAutofillFromVault(viewingDoc); setViewingDoc(null); }} className="bg-govblue text-white font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 shadow-md transition flex items-center">
+                <Sparkles className="w-4.5 h-4.5 mr-2" /> Use for Autofill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

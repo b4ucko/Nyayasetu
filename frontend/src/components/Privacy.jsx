@@ -31,9 +31,9 @@ export default function Privacy() {
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-sm">
           <Lock className="w-6 h-6 text-govorange mb-4" />
-          <h3 className="font-bold text-slate-900 dark:text-white mb-2">DigiLocker Security</h3>
+          <h3 className="font-bold text-slate-900 dark:text-white mb-2">Vault Isolation</h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            Integration is handled directly through the official secure portals with read-only permissions.
+            Your documents are stored entirely locally on your device, locked strictly to your unique UID, and never shared with third parties.
           </p>
         </div>
       </div>
@@ -67,9 +67,9 @@ export default function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-2xl font-bold text-slate-950 dark:text-white mb-4">4. Third-Party Integrations</h2>
+          <h2 className="text-2xl font-bold text-slate-950 dark:text-white mb-4">4. Secure Local-First Vault</h2>
           <p>
-            Nyayasetu interfaces with official authentication services like DigiLocker via OAuth. We do not store your DigiLocker security PIN or password. Any tokens acquired are stored securely in local browser storage or encrypted sessions.
+            The Secure Document Vault stores your identity cards and certificates locally in your browser. All data is keyed strictly under your unique Supabase User ID (UID), ensuring that no other user or third party can ever access your personal details or documents.
           </p>
         </section>
 

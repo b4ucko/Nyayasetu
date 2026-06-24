@@ -18,7 +18,7 @@ export default function HelpCenter() {
       id: 1,
       category: 'schemes',
       question: 'How does the Government Schemes Matcher work?',
-      answer: 'Our advanced multi-agent AI RAG (Retrieval-Augmented Generation) system compares your demographic profile (extracted from DigiLocker or manually inputted) with thousands of active national and state government policy documents to suggest matches with the highest accuracy.'
+      answer: 'Our advanced multi-agent AI RAG (Retrieval-Augmented Generation) system compares your demographic profile (extracted from your Secure Document Vault or manually inputted) with thousands of active national and state government policy documents to suggest matches with the highest accuracy.'
     },
     {
       id: 2,
@@ -41,8 +41,8 @@ export default function HelpCenter() {
     {
       id: 5,
       category: 'verification',
-      question: 'How do I connect my DigiLocker?',
-      answer: 'Simply log in to your Nyayasetu account, navigate to the Dashboard, and click on "Connect DigiLocker." You will be redirected to the official government portal to authorize read-only secure sharing.'
+      question: 'How does the Secure Document Vault work?',
+      answer: 'The Secure Document Vault allows you to upload and store your identity documents and certificates locally in your browser. All data is encrypted/keyed strictly to your unique User ID (UID) and processed entirely on your device, ensuring 100% privacy and security.'
     }
   ];
 

@@ -70,7 +70,6 @@ import DocumentAnalyzer from './components/dashboard/DocumentAnalyzer';
 import NoticeChecker from './components/dashboard/NoticeChecker';
 import VoiceAssistant from './components/dashboard/VoiceAssistant';
 import ServiceBot from './components/ServiceBot';
-import DigilockerCallback from './components/DigilockerCallback';
 import CursorGlow from './components/CursorGlow';
 import Footer from './components/Footer';
 
@@ -208,7 +207,6 @@ function App() {
             <Routes>
               <Route path="/" element={<Home openBot={openBot} />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/callback" element={<DigilockerCallback />} />
 
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
                 {/* Dashboard now exclusively renders ProfileBuilder as its index */}
