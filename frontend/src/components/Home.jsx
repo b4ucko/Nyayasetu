@@ -3,7 +3,7 @@ import ScrollExperience from './3d/ScrollExperience';
 
 export default function Home() {
   return (
-    <div className="w-full h-screen fixed inset-0 z-10">
+    <div className="w-full h-[calc(100vh-64px)] relative z-10">
       <ScrollExperience />
     </div>
   );

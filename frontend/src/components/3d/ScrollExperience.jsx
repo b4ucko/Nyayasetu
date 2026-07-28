@@ -1,120 +1,127 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, ScrollControls, Scroll, useScroll, Float, Lightformer } from '@react-three/drei';
+import { Environment, ScrollControls, Scroll, useScroll, Float, ContactShadows, SpotLight } from '@react-three/drei';
 import * as THREE from 'three';
 import { useNavigate } from 'react-router-dom';
-import { Scale, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Search, FileText, Scale, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
 
-// --- Premium Materials ---
-const woodMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#2a1a10',
-  roughness: 0.15,
+// --- TRUE 3D Materials (High Contrast) ---
+const leatherMaterial = new THREE.MeshStandardMaterial({
+  color: '#3d1c04', // Deep leather brown
+  roughness: 0.6,
   metalness: 0.1,
-  clearcoat: 1.0,
-  clearcoatRoughness: 0.1,
+  bumpScale: 0.02,
 });
 
-const goldMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#ffd700',
-  roughness: 0.2,
-  metalness: 1.0,
-  clearcoat: 0.5,
-});
-
-const marbleMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#f0f0f0',
-  roughness: 0.3,
-  metalness: 0.05,
-  clearcoat: 0.1,
-});
-
-const paperMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#ffffff',
-  roughness: 0.8,
+const paperMaterial = new THREE.MeshStandardMaterial({
+  color: '#fdfbf7', // Off-white antique paper
+  roughness: 0.9,
   metalness: 0.0,
-  transmission: 0.1,
-  transparent: true,
-  opacity: 0.9,
+  side: THREE.DoubleSide,
 });
 
-// --- 3D Components ---
+const woodMaterial = new THREE.MeshStandardMaterial({
+  color: '#2a1a10',
+  roughness: 0.3,
+  metalness: 0.1,
+});
 
-function CourthousePillars() {
+const goldMaterial = new THREE.MeshStandardMaterial({
+  color: '#ffbf00',
+  roughness: 0.1,
+  metalness: 1.0, // Full metal for true 3D reflections
+});
+
+// --- 3D Objects ---
+
+function LawBook() {
   const group = useRef();
+  const pagesGroup = useRef();
   const scroll = useScroll();
 
-  useFrame(() => {
-    // Parallax effect: moving up as user scrolls down
-    group.current.position.y = THREE.MathUtils.lerp(0, 10, scroll.offset);
-  });
+  // Create an array of pages
+  const numPages = 15;
+  const pages = useMemo(() => {
+    return Array.from({ length: numPages }).map((_, i) => {
+      // Each page needs a slightly different rotation speed/trigger point
+      return { id: i, targetRotation: Math.PI - 0.1 };
+    });
+  }, [numPages]);
 
-  return (
-    <group ref={group}>
-      {/* Pushed far out to frame the scene, not block the text */}
-      <mesh material={marbleMaterial} position={[-7, -5, 2]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.8, 0.8, 20, 32]} />
-      </mesh>
-      <mesh material={marbleMaterial} position={[7, -5, 2]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.8, 0.8, 20, 32]} />
-      </mesh>
+  const pageRefs = useRef([]);
+
+  useFrame(() => {
+    const offset = scroll.offset; // 0 to 1
+
+    // Book positioning: Starts bottom right, floats up and rotates open
+    group.current.position.x = THREE.MathUtils.lerp(3, -4, offset);
+    group.current.position.y = THREE.MathUtils.lerp(-4, 2, offset);
+    group.current.position.z = THREE.MathUtils.lerp(0, -2, offset);
+    
+    // Book rotation (spins slightly as it moves)
+    group.current.rotation.x = THREE.MathUtils.lerp(0.5, 0.2, offset);
+    group.current.rotation.y = THREE.MathUtils.lerp(-0.5, 0.5, offset);
+    group.current.rotation.z = THREE.MathUtils.lerp(0, -0.1, offset);
+
+    // Flipping pages logic
+    // The scroll offset dictates how many pages have flipped
+    const flipProgress = offset * 2.0; // scales up so pages flip during the middle of the scroll
+    
+    pageRefs.current.forEach((page, i) => {
+      if (!page) return;
+      // Calculate individual page flip threshold based on its index
+      const threshold = (i / numPages);
       
-      {/* Background Pillars */}
-      <mesh material={marbleMaterial} position={[-12, -5, -8]} castShadow receiveShadow>
-        <cylinderGeometry args={[1.5, 1.5, 30, 32]} />
-      </mesh>
-      <mesh material={marbleMaterial} position={[12, -5, -8]} castShadow receiveShadow>
-        <cylinderGeometry args={[1.5, 1.5, 30, 32]} />
-      </mesh>
-    </group>
-  );
-}
-
-function FloatingDocuments() {
-  const group = useRef();
-  const scroll = useScroll();
-
-  // Create documents further back and wider so they don't clip the center text
-  const docs = useMemo(() => {
-    return Array.from({ length: 15 }).map(() => ({
-      position: [
-        (Math.random() - 0.5) * 20, // Wider spread
-        (Math.random() - 0.5) * 20,
-        -5 - Math.random() * 10 // Pushed back further
-      ],
-      rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
-      speed: Math.random() * 2 + 1
-    }));
-  }, []);
-
-  useFrame(() => {
-    const offset = scroll.offset;
-    group.current.rotation.y = offset * Math.PI * 0.5;
-    group.current.position.y = offset * 5;
-
-    group.current.children.forEach((child, i) => {
-      child.rotation.x += 0.002 * docs[i].speed;
-      child.rotation.y += 0.003 * docs[i].speed;
+      // If scroll progress is past this page's threshold, flip it
+      if (flipProgress > threshold) {
+        // Smoothly rotate to PI (180 degrees)
+        page.rotation.y = THREE.MathUtils.lerp(page.rotation.y, Math.PI - 0.05 * i, 0.1);
+      } else {
+        // Rest at 0 (or slightly offset for thickness)
+        page.rotation.y = THREE.MathUtils.lerp(page.rotation.y, 0.05 * i, 0.1);
+      }
     });
   });
 
   return (
     <group ref={group}>
-      {docs.map((doc, i) => (
-        <group key={i} position={doc.position} rotation={doc.rotation}>
-          <mesh material={paperMaterial} castShadow receiveShadow>
-            <boxGeometry args={[1.5, 2.1, 0.02]} />
-          </mesh>
-          <mesh material={woodMaterial} position={[0, 0.5, 0.015]}>
-            <boxGeometry args={[1.0, 0.05, 0.01]} />
-          </mesh>
-          <mesh material={woodMaterial} position={[0, 0.3, 0.015]}>
-            <boxGeometry args={[1.2, 0.05, 0.01]} />
-          </mesh>
-          <mesh material={woodMaterial} position={[0, 0.1, 0.015]}>
-            <boxGeometry args={[0.8, 0.05, 0.01]} />
+      <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
+        {/* Book Cover (Back spine and back cover) */}
+        <mesh material={leatherMaterial} position={[0, -0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[3.2, 0.2, 4.2]} />
+        </mesh>
+        
+        {/* Spine */}
+        <mesh material={leatherMaterial} position={[-1.6, 0.3, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.4, 0.4, 4.2, 16, 1, false, 0, Math.PI]} />
+        </mesh>
+
+        {/* Flipping Pages (Anchored at the spine: x = -1.5) */}
+        <group ref={pagesGroup} position={[-1.5, 0.1, 0]}>
+          {pages.map((p, i) => (
+            <group key={p.id} ref={el => pageRefs.current[i] = el}>
+              {/* The actual page mesh offset so it rotates around the spine hinge */}
+              <mesh material={paperMaterial} position={[1.5, 0, 0]} castShadow receiveShadow>
+                <boxGeometry args={[3.0, 0.02, 4.0]} />
+              </mesh>
+            </group>
+          ))}
+          {/* Static block of unflipped pages to give thickness */}
+          <mesh material={paperMaterial} position={[1.5, 0.2, 0]} castShadow receiveShadow>
+             <boxGeometry args={[2.9, 0.4, 3.9]} />
           </mesh>
         </group>
-      ))}
+        
+        {/* Front Cover (Static, attached to the spine) */}
+        <group position={[-1.5, 0.7, 0]} rotation={[0, 0, -0.1]}>
+          <mesh material={leatherMaterial} position={[1.6, 0, 0]} castShadow receiveShadow>
+            <boxGeometry args={[3.2, 0.1, 4.2]} />
+          </mesh>
+          <mesh material={goldMaterial} position={[1.6, 0.06, 0]} castShadow>
+             <boxGeometry args={[2.8, 0.02, 3.8]} />
+          </mesh>
+        </group>
+      </Float>
     </group>
   );
 }
@@ -128,57 +135,53 @@ function ScalesOfJustice() {
     const time = state.clock.getElapsedTime();
     const offset = scroll.offset;
 
-    // The Scales should be prominent on Page 2 (offset ~0.5), positioned on the LEFT 
-    // to balance the text on the RIGHT.
-    // Start deep background right, move to mid-ground left.
-    group.current.position.x = THREE.MathUtils.lerp(5, -4, offset * 2);
-    group.current.position.z = THREE.MathUtils.lerp(-20, -8, offset);
-    group.current.position.y = THREE.MathUtils.lerp(5, -2, offset);
+    // Starts in background, moves into view
+    group.current.position.x = THREE.MathUtils.lerp(-8, 5, offset);
+    group.current.position.y = THREE.MathUtils.lerp(5, 0, offset);
+    group.current.position.z = THREE.MathUtils.lerp(-10, -5, offset);
     
-    // Tipping motion
-    beam.current.rotation.z = Math.sin(time * 0.5) * 0.1 + (offset * 0.2);
+    group.current.rotation.y = THREE.MathUtils.lerp(0, -Math.PI / 4, offset);
+    
+    // Strong tipping motion
+    beam.current.rotation.z = Math.sin(time * 0.8) * 0.15;
   });
 
   return (
-    <group ref={group} position={[5, 5, -20]}>
+    <group ref={group}>
       <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.5}>
-        {/* Base and Pillar */}
-        <mesh material={goldMaterial} position={[0, -3, 0]} castShadow>
+        <mesh material={goldMaterial} position={[0, -3, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[1, 1.2, 0.5, 32]} />
         </mesh>
-        <mesh material={goldMaterial} position={[0, -0.5, 0]} castShadow>
-          <cylinderGeometry args={[0.1, 0.15, 5, 32]} />
+        <mesh material={goldMaterial} position={[0, -0.5, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.1, 0.2, 5, 32]} />
         </mesh>
         
-        {/* Tilting Beam */}
         <group ref={beam} position={[0, 2, 0]}>
-          <mesh material={goldMaterial} castShadow>
-             <cylinderGeometry args={[0.05, 0.05, 6, 32]} rotation={[0, 0, Math.PI / 2]} />
+          <mesh material={goldMaterial} castShadow receiveShadow>
+             <cylinderGeometry args={[0.1, 0.1, 6, 32]} rotation={[0, 0, Math.PI / 2]} />
           </mesh>
           
-          {/* Left Pan */}
           <group position={[-2.8, 0, 0]}>
-            <mesh material={goldMaterial} position={[0, -2, 0]} castShadow>
+            <mesh material={goldMaterial} position={[0, -2, 0]} castShadow receiveShadow>
               <cylinderGeometry args={[1, 1, 0.1, 32]} />
             </mesh>
-            <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]}>
-               <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
+            <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]} castShadow>
+               <cylinderGeometry args={[0.02, 0.02, 2.2, 8]} />
             </mesh>
-            <mesh material={goldMaterial} position={[0.9, -1, 0]} rotation={[0, 0, 0.4]}>
-               <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
+            <mesh material={goldMaterial} position={[0.9, -1, 0]} rotation={[0, 0, 0.4]} castShadow>
+               <cylinderGeometry args={[0.02, 0.02, 2.2, 8]} />
             </mesh>
           </group>
 
-          {/* Right Pan */}
           <group position={[2.8, 0, 0]}>
-            <mesh material={goldMaterial} position={[0, -2, 0]} castShadow>
+            <mesh material={goldMaterial} position={[0, -2, 0]} castShadow receiveShadow>
               <cylinderGeometry args={[1, 1, 0.1, 32]} />
             </mesh>
-            <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]}>
-               <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
+            <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]} castShadow>
+               <cylinderGeometry args={[0.02, 0.02, 2.2, 8]} />
             </mesh>
-            <mesh material={goldMaterial} position={[0.9, -1, 0]} rotation={[0, 0, 0.4]}>
-               <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
+            <mesh material={goldMaterial} position={[0.9, -1, 0]} rotation={[0, 0, 0.4]} castShadow>
+               <cylinderGeometry args={[0.02, 0.02, 2.2, 8]} />
             </mesh>
           </group>
         </group>
@@ -187,168 +190,154 @@ function ScalesOfJustice() {
   );
 }
 
-function Gavel(props) {
-  const group = useRef();
-  const scroll = useScroll();
-
-  useFrame(() => {
-    const offset = scroll.offset; 
-
-    // Rotation
-    group.current.rotation.y = THREE.MathUtils.lerp(0, Math.PI * 2, offset);
-    group.current.rotation.x = THREE.MathUtils.lerp(0.2, -0.2, offset);
-    group.current.rotation.z = THREE.MathUtils.lerp(-0.4, 0.2, offset);
-
-    // Choreographed Positions:
-    // Page 1 (offset 0): Center, slightly below text
-    // Page 2 (offset 0.5): Move to Left side (x = -3, y = 1) to balance right-aligned text
-    // Page 3 (offset 1): Move back to Center (x = 0, y = -1.5) for the strike
-
-    if (offset < 0.5) {
-      // Transition from Page 1 to Page 2
-      const localOffset = offset * 2; // 0 to 1
-      group.current.position.x = THREE.MathUtils.lerp(0, -3.5, localOffset);
-      group.current.position.y = THREE.MathUtils.lerp(-2.5, 0.5, localOffset);
-      group.current.position.z = THREE.MathUtils.lerp(0, 2, localOffset);
-    } else {
-      // Transition from Page 2 to Page 3
-      const localOffset = (offset - 0.5) * 2; // 0 to 1
-      group.current.position.x = THREE.MathUtils.lerp(-3.5, 0, localOffset);
-      group.current.position.z = THREE.MathUtils.lerp(2, 0, localOffset);
-      
-      // Strike animation at the very end
-      if (localOffset > 0.8) {
-        const strikeProgress = (localOffset - 0.8) * 5; // 0 to 1
-        group.current.rotation.z -= Math.sin(strikeProgress * Math.PI) * 1.0;
-        group.current.position.y = THREE.MathUtils.lerp(0.5, -2, 0.8) - Math.sin(strikeProgress * Math.PI) * 1.5;
-      } else {
-        group.current.position.y = THREE.MathUtils.lerp(0.5, -2, localOffset);
-      }
-    }
-  });
-
-  return (
-    <group ref={group} {...props} dispose={null}>
-      <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-        {/* Handle */}
-        <mesh material={woodMaterial} position={[0, -2, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.15, 0.2, 4, 32]} />
-        </mesh>
-        {/* Head Base */}
-        <mesh material={woodMaterial} position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.5, 0.5, 2, 32]} />
-        </mesh>
-        {/* Gold Bands */}
-        <mesh material={goldMaterial} position={[0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.55, 0.55, 0.2, 32]} />
-        </mesh>
-        <mesh material={goldMaterial} position={[-0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.55, 0.55, 0.2, 32]} />
-        </mesh>
-        {/* Head Ends */}
-        <mesh material={woodMaterial} position={[1.1, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.4, 0.5, 0.4, 32]} />
-        </mesh>
-        <mesh material={woodMaterial} position={[-1.1, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.4, 0.5, 0.4, 32]} />
-        </mesh>
-        {/* Handle Detail */}
-        <mesh material={goldMaterial} position={[0, -0.5, 0]} castShadow>
-          <cylinderGeometry args={[0.18, 0.18, 0.3, 32]} />
-        </mesh>
-        <mesh material={goldMaterial} position={[0, -3.5, 0]} castShadow>
-          <cylinderGeometry args={[0.22, 0.25, 0.5, 32]} />
-        </mesh>
-      </Float>
-    </group>
-  );
-}
-
-function SoundingBlock(props) {
-  const group = useRef();
-  const scroll = useScroll();
-
-  useFrame(() => {
-    const offset = scroll.offset;
-    // Block waits below, rises up to center to catch the strike at the end
-    group.current.position.y = THREE.MathUtils.lerp(-10, -3.5, offset); 
-    group.current.position.x = THREE.MathUtils.lerp(0, 0, offset); // Stay center
-  });
-
-  return (
-    <group ref={group} {...props} dispose={null}>
-      <mesh material={woodMaterial} position={[0, -0.2, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[2, 2.2, 0.4, 64]} />
-      </mesh>
-      <mesh material={goldMaterial} position={[0, 0.05, 0]}>
-        <cylinderGeometry args={[1.8, 1.8, 0.1, 64]} />
-      </mesh>
-    </group>
-  );
-}
-
-// --- HTML Content Overlay ---
+// --- HTML Content Overlay (Restored Full Features) ---
 function HtmlContent() {
   const navigate = useNavigate();
-  
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/schemes?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
   return (
-    <Scroll html style={{ width: '100%', height: '100%' }}>
-      {/* Page 1: Hero (Centered) */}
-      <div className="w-screen h-screen flex flex-col justify-center items-center text-center px-10 relative pointer-events-none">
-        {/* Adjusted padding/margin so it sits nicely above the Gavel (which is at y=-2.5) */}
-        <div className="pointer-events-auto bg-white/40 backdrop-blur-md p-8 rounded-3xl border border-white/60 shadow-2xl max-w-3xl -mt-32">
-          <h1 className="text-5xl md:text-7xl font-black font-serif text-slate-900 tracking-tighter mb-6 leading-tight">
-            Justice. Redefined.
-          </h1>
-          <p className="text-xl md:text-2xl font-medium text-slate-800 mb-8">
-            A premium digital advocate empowering citizens with scheme matching and legal intelligence.
-          </p>
-          <div className="flex justify-center">
-            <button onClick={() => navigate('/schemes')} className="bg-slate-900 text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-slate-800 transition-colors flex items-center gap-3 shadow-xl">
-              Explore Schemes <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <Scroll html style={{ width: '100%' }}>
+      <div className="w-full text-slate-900 overflow-x-hidden">
+        
+        {/* Search Hero Section (Restored & Enhanced) */}
+        <section className="relative w-full min-h-[90vh] flex flex-col justify-center py-20">
+          <div className="container mx-auto px-6 max-w-5xl relative z-10 pointer-events-auto">
+            {/* Added a subtle blur backing to make text pop against 3D objects */}
+            <div className="bg-white/70 backdrop-blur-md p-10 md:p-16 rounded-[3rem] border border-white/60 shadow-2xl">
+              <div className="text-center">
+                <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6 font-serif leading-tight">
+                  Digital Citizen<br/>Advocacy Platform
+                </h1>
+                <p className="text-xl text-slate-700 mb-10 max-w-2xl mx-auto font-medium">
+                  Find government welfare schemes, understand legal notices, and verify official documents in seconds.
+                </p>
 
-      {/* Page 2: Features (Right Aligned to balance Left-side 3D objects) */}
-      <div className="w-screen h-screen flex flex-col justify-center px-10 md:px-32 relative pointer-events-none">
-        <div className="pointer-events-auto max-w-xl ml-auto md:mr-16 bg-white/40 backdrop-blur-xl p-10 rounded-3xl border border-white/60 shadow-2xl">
-          <h2 className="text-4xl md:text-6xl font-bold font-serif text-slate-900 mb-10">Total Mastery</h2>
-          
-          <div className="space-y-8">
-            <div className="flex gap-6 group cursor-pointer" onClick={() => navigate('/notices')}>
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
-                <Scale className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 mb-1">Legal Assessor</h3>
-                <p className="text-slate-700 font-medium">Deconstruct complex court notices into actionable intelligence instantly.</p>
+                <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto mb-8">
+                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                    <Search className="h-6 w-6 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    className="block w-full pl-14 pr-6 py-5 border-2 border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-600/20 focus:border-blue-600 shadow-sm text-lg font-medium transition-all"
+                    placeholder="Search for schemes, services, or legal help..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="absolute inset-y-2 right-2 px-8 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors font-bold text-lg"
+                  >
+                    Search
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-600 font-medium">
+                  <span>Popular:</span>
+                  <button onClick={() => navigate('/schemes?q=PM+Kisan')} className="hover:text-blue-700 hover:underline underline-offset-4">PM Kisan</button>
+                  <button onClick={() => navigate('/schemes?q=Mudra+Loan')} className="hover:text-blue-700 hover:underline underline-offset-4">Mudra Loan</button>
+                  <button onClick={() => navigate('/notices')} className="hover:text-blue-700 hover:underline underline-offset-4">Traffic Challan</button>
+                </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Pathways / Action Cards (Restored) */}
+        <section className="py-24 relative pointer-events-auto">
+          <div className="container mx-auto px-6 max-w-7xl relative z-10">
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-12 font-serif text-center bg-white/60 backdrop-blur-sm inline-block px-8 py-3 rounded-full border border-white/50 shadow-sm">
+              What do you need help with today?
+            </h2>
             
-            <div className="flex gap-6 group cursor-pointer" onClick={() => navigate('/documents')}>
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-7 h-7 text-white" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              
+              <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-xl flex flex-col h-full cursor-pointer group hover:-translate-y-2 transition-transform duration-300" onClick={() => navigate('/schemes')}>
+                <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center mb-6 border border-blue-200 group-hover:scale-110 transition-transform">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3 font-serif">Find Welfare Schemes</h3>
+                <p className="text-slate-600 mb-8 flex-grow text-lg leading-relaxed">
+                  Check eligibility and apply for over 500+ central and state government schemes tailored to your profile.
+                </p>
+                <div className="flex items-center text-blue-700 font-bold text-lg">
+                  Start matching <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" />
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 mb-1">Fraud Verifier</h3>
-                <p className="text-slate-700 font-medium">Cryptographically authenticate state documents and certificates.</p>
+
+              <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-xl flex flex-col h-full cursor-pointer group hover:-translate-y-2 transition-transform duration-300" onClick={() => navigate('/notices')}>
+                <div className="w-16 h-16 bg-indigo-100 text-indigo-700 rounded-2xl flex items-center justify-center mb-6 border border-indigo-200 group-hover:scale-110 transition-transform">
+                  <Scale className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3 font-serif">Analyze Legal Notice</h3>
+                <p className="text-slate-600 mb-8 flex-grow text-lg leading-relaxed">
+                  Upload court summons, traffic challans, or legal notices to get a plain-language summary and auto-drafted response.
+                </p>
+                <div className="flex items-center text-indigo-700 font-bold text-lg">
+                  Upload notice <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-xl flex flex-col h-full cursor-pointer group hover:-translate-y-2 transition-transform duration-300" onClick={() => navigate('/documents')}>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mb-6 border border-emerald-200 group-hover:scale-110 transition-transform">
+                  <ShieldCheck className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3 font-serif">Verify a Document</h3>
+                <p className="text-slate-600 mb-8 flex-grow text-lg leading-relaxed">
+                  Scan certificates and official documents to verify digital signatures, QR codes, and prevent fraud.
+                </p>
+                <div className="flex items-center text-emerald-700 font-bold text-lg">
+                  Start verification <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* How it Works Stepper (Restored) */}
+        <section className="py-24 relative pointer-events-auto">
+          <div className="container mx-auto px-6 max-w-5xl relative z-10">
+            <div className="bg-white/90 backdrop-blur-xl rounded-[3rem] p-12 md:p-20 shadow-2xl border border-white/50 text-center">
+              <h2 className="text-4xl font-black text-slate-900 mb-4 font-serif">How Nyayasetu Works</h2>
+              <p className="text-xl text-slate-600 mb-16">A secure, streamlined process to advocate for your rights.</p>
+
+              <div className="flex flex-col md:flex-row justify-between relative">
+                {/* Desktop connecting line */}
+                <div className="hidden md:block absolute top-8 left-[15%] right-[15%] h-1 bg-slate-200 -z-10 rounded-full"></div>
+                
+                {[
+                  { step: '01', title: 'Create Profile', desc: 'Securely enter your demographic details.' },
+                  { step: '02', title: 'AI Analysis', desc: 'Our engine cross-references official databases.' },
+                  { step: '03', title: 'Take Action', desc: 'Apply directly or generate legal responses.' }
+                ].map((item, index) => (
+                  <div key={index} className="flex flex-col items-center text-center mb-10 md:mb-0 relative z-10 w-full md:w-1/3">
+                    <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-2xl mb-6 shadow-xl ring-8 ring-white transform rotate-3">
+                      {item.step}
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-3">{item.title}</h3>
+                    <p className="text-slate-600 text-lg max-w-[200px]">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-16 pt-12 border-t border-slate-200">
+                <p className="text-sm font-bold text-slate-500 mb-6 uppercase tracking-widest">Built with Trusted Security Standards</p>
+                <div className="flex flex-wrap justify-center gap-8 md:gap-16 items-center opacity-70">
+                  <div className="flex items-center gap-3 text-slate-700 font-black text-lg"><ShieldCheck className="w-6 h-6"/> 256-bit Encryption</div>
+                  <div className="flex items-center gap-3 text-slate-700 font-black text-lg"><CheckCircle2 className="w-6 h-6"/> Privacy First</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Page 3: Call to action (Centered, sits above the striking gavel) */}
-      <div className="w-screen h-screen flex flex-col justify-center items-center text-center px-10 relative pointer-events-none">
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-2xl p-16 rounded-[3rem] shadow-2xl border border-slate-700 max-w-4xl w-full -mt-48">
-          <h2 className="text-5xl md:text-6xl font-bold font-serif text-white mb-6">Take Command</h2>
-          <p className="text-xl text-slate-300 mb-10 font-light">Join thousands of citizens asserting their rights.</p>
-          <button onClick={() => navigate('/login')} className="bg-white text-slate-900 px-10 py-4 rounded-full text-xl font-bold hover:bg-slate-100 transition-all hover:scale-105 shadow-2xl">
-            Create Free Profile
-          </button>
-        </div>
       </div>
     </Scroll>
   );
@@ -356,46 +345,58 @@ function HtmlContent() {
 
 export default function ScrollExperience() {
   return (
-    <div className="w-full h-screen bg-[#F0F2F5] overflow-hidden">
+    <div className="w-full h-screen bg-[#e8ecef] overflow-hidden">
+      {/* 
+        We use a standard scrollbar via pages={3} but we map the HTML 
+        over the canvas so the user can scroll through the real content.
+      */}
       <Canvas
         shadows
-        camera={{ position: [0, 0, 10], fov: 45 }}
+        camera={{ position: [0, 0, 12], fov: 45 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
       >
-        <color attach="background" args={['#F0F2F5']} />
-        <fog attach="fog" args={['#F0F2F5', 10, 40]} />
+        <color attach="background" args={['#e8ecef']} />
         
-        <ambientLight intensity={1.5} />
+        {/* TRUE 3D LIGHTING: High contrast, stark shadows */}
+        <ambientLight intensity={0.5} />
+        
         <directionalLight 
           castShadow 
           position={[10, 20, 15]} 
-          intensity={2.5} 
+          intensity={3} 
           shadow-mapSize={[2048, 2048]} 
+          shadow-camera-far={50}
+          shadow-camera-left={-10}
+          shadow-camera-right={10}
+          shadow-camera-top={10}
+          shadow-camera-bottom={-10}
+          shadow-bias={-0.0001}
         />
-        <spotLight position={[-10, 10, 10]} intensity={1.5} angle={0.4} penumbra={1} castShadow />
+        
+        <SpotLight 
+          position={[-10, 15, 10]} 
+          angle={0.3} 
+          penumbra={1} 
+          intensity={5} 
+          castShadow 
+          color="#ffffff"
+        />
 
-        {/* High-end environment reflections */}
-        <Environment preset="city" background={false}>
-           <Lightformer form="rect" intensity={5} position={[0, 5, -10]} scale={[10, 10, 1]} target={[0,0,0]} />
-           <Lightformer form="rect" intensity={2} position={[-10, 5, 0]} scale={[10, 10, 1]} target={[0,0,0]} />
-           <Lightformer form="ring" intensity={3} position={[10, 5, 0]} scale={[10, 10, 1]} target={[0,0,0]} />
-        </Environment>
+        <Environment preset="studio" />
 
-        <ScrollControls pages={3} damping={0.1}>
-          {/* Parallax / Environment Objects */}
+        <ScrollControls pages={3} damping={0.2} distance={1.2}>
+          {/* Dynamic 3D Objects that react to the scroll */}
           <Scroll>
-            <CourthousePillars />
+            <LawBook />
             <ScalesOfJustice />
-            <FloatingDocuments />
-            
-            {/* The main interactive focal points */}
-            <Gavel />
-            <SoundingBlock />
           </Scroll>
 
-          {/* HTML Overlay */}
+          {/* The restored, full-featured HTML layout */}
           <HtmlContent />
         </ScrollControls>
+        
+        {/* Floor to catch shadows and ground the scene */}
+        <ContactShadows position={[0, -6, 0]} opacity={0.4} scale={50} blur={2} far={10} />
       </Canvas>
     </div>
   );
