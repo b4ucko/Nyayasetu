@@ -1,5 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Moon, Sun, PhoneCall, Mic, Bot } from 'lucide-react';
+import Home from './components/Home';
+import ProfileForm from './components/ProfileForm';
+import DashboardOverview from './components/DashboardOverview';
+import Login from './components/Login';
+import Dashboard from './components/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider, useAuth } from './hooks/useAuth';
+
+// AI Advanced Components
+import ProfileBuilder from './components/dashboard/ProfileBuilder';
+import SchemeMatcher from './components/dashboard/SchemeMatcher';
+import SchemeDetails from './components/dashboard/SchemeDetails';
+import DocumentAnalyzer from './components/dashboard/DocumentAnalyzer';
+import NoticeChecker from './components/dashboard/NoticeChecker';
+import VoiceAssistant from './components/dashboard/VoiceAssistant';
+import ServiceBot from './components/ServiceBot';
+import CursorGlow from './components/CursorGlow';
+import Footer from './components/Footer';
+
+// Public legal/help pages
+import HelpCenter from './components/HelpCenter';
+import Privacy from './components/Privacy';
+import Terms from './components/Terms';
+import Accessibility from './components/Accessibility';
+import ScrollToTop from './components/ScrollToTop';
 
 function VoiceFAB({ setVoiceBotOpen, isServiceBotOpen, offset }) {
   const location = useLocation();
@@ -52,33 +78,6 @@ function ScrollObserver({ setFooterOffset }) {
 
   return null;
 }
-
-import { Moon, Sun, PhoneCall, Mic, Bot } from 'lucide-react';
-import Home from './components/Home';
-import ProfileForm from './components/ProfileForm';
-import DashboardOverview from './components/DashboardOverview';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
-import ProtectedRoute from './components/ProtectedRoute';
-import { AuthProvider, useAuth } from './hooks/useAuth';
-
-// AI Advanced Components
-import ProfileBuilder from './components/dashboard/ProfileBuilder';
-import SchemeMatcher from './components/dashboard/SchemeMatcher';
-import SchemeDetails from './components/dashboard/SchemeDetails';
-import DocumentAnalyzer from './components/dashboard/DocumentAnalyzer';
-import NoticeChecker from './components/dashboard/NoticeChecker';
-import VoiceAssistant from './components/dashboard/VoiceAssistant';
-import ServiceBot from './components/ServiceBot';
-import CursorGlow from './components/CursorGlow';
-import Footer from './components/Footer';
-
-// Public legal/help pages
-import HelpCenter from './components/HelpCenter';
-import Privacy from './components/Privacy';
-import Terms from './components/Terms';
-import Accessibility from './components/Accessibility';
-import ScrollToTop from './components/ScrollToTop';
 
 function Navigation({ theme, toggleTheme }) {
   const { user, logout } = useAuth();

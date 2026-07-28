@@ -2,11 +2,17 @@ import os
 import time
 import html
 import hashlib
+import json
+import base64
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from google import genai
 from google.genai import types
-import json
+from openai import OpenAI
+from dotenv import load_dotenv
+# Resolve path to backend/.env
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+load_dotenv(os.path.join(backend_dir, ".env"))
 
 from .validation_utils import validate_alphanumeric_dashed, validate_uploaded_file
 
@@ -14,82 +20,23 @@ from .validation_utils import validate_alphanumeric_dashed, validate_uploaded_fi
 router = APIRouter()
 MATCHES_CACHE = {}
 
-# --- GEMINI CLIENT CONFIGURATION ---
-# Load up to 10 sequential API keys from environment variables
-FREE_KEYS = []
-for i in range(1, 11):
-    # Support multiple naming patterns (GEMINI_SECRET_KEY1, GEMINI_SECRET_KEY_1, GEMINI_API_KEY_1, GEMINI_API_KEY1)
-    keys_to_try = [
-        os.getenv(f"GEMINI_SECRET_KEY{i}"),
-        os.getenv(f"GEMINI_SECRET_KEY_{i}"),
-        os.getenv(f"GEMINI_API_KEY_{i}"),
-        os.getenv(f"GEMINI_API_KEY{i}")
-    ]
-    for key in keys_to_try:
-        if key and key.strip() and not key.startswith("your_gemini_"):
-            val = key.strip()
-            if val not in FREE_KEYS:
-                FREE_KEYS.append(val)
-            break
+# --- OPENROUTER CLIENT CONFIGURATION ---
+# PLACE YOUR OPENROUTER API KEY IN YOUR ENVIRONMENT OR `.env` FILE AS: OPENROUTER_API_KEY
+# THE BASE URL ROUTING MUST POINT TO OPENROUTER'S GATEWAY API INTERFACE
+or_client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY")  # <- WRITE / STORE YOUR API KEY IN YOUR LOCAL ENV VARIABLES
+)
 
-# Fallback to the default single GEMINI_API_KEY or GEMINI_SECRET_KEY if no sequential keys were set
-for default_env_var in ["GEMINI_API_KEY", "GEMINI_SECRET_KEY"]:
-    default_key = os.getenv(default_env_var)
-    if default_key and default_key.strip() and not default_key.startswith("your_gemini_"):
-        if default_key.strip() not in FREE_KEYS:
-            FREE_KEYS.append(default_key.strip())
+class OmniGovModels:
+    LEGAL_REASONING = "openrouter/owl-alpha"
+    DOCUMENT_VISION = "nvidia/nemotron-nano-12b-v2-vl:free"
+    VOICE_PERCEPTION = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
-
-class RotatingModels:
-    def __init__(self, parent):
-        self.parent = parent
-
-    async def generate_content(self, *args, **kwargs):
-        clients_to_try = self.parent.clients if self.parent.clients else [genai.Client()]
-        last_error = None
-        
-        for _ in range(len(clients_to_try)):
-            idx = self.parent.current_index
-            current_client = clients_to_try[idx]
-            
-            # Rotate index to next client
-            if self.parent.clients:
-                self.parent.current_index = (idx + 1) % len(self.parent.clients)
-                
-            try:
-                return await current_client.aio.models.generate_content(*args, **kwargs)
-            except Exception as e:
-                print(f"Key Rotation Failover: Key at index {idx} failed with error: {str(e)}. Trying next key...")
-                last_error = e
-                continue
-                
-        raise last_error
-
-class RotatingAio:
-    def __init__(self, parent):
-        self.models = RotatingModels(parent)
-
-class RoundRobinClient:
-    def __init__(self, keys):
-        self.clients = []
-        self.current_index = 0
-        for key in keys:
-            try:
-                self.clients.append(genai.Client(api_key=key))
-            except Exception as e:
-                print(f"Warning: Failed to load a Gemini Key: {e}")
-        
-        self.aio = RotatingAio(self)
-
-    def __bool__(self):
-        return len(self.clients) > 0 or os.getenv("GEMINI_API_KEY") is not None or os.getenv("GEMINI_SECRET_KEY") is not None
-
-# Initialize Master Rotating Client
-client = RoundRobinClient(FREE_KEYS)
-
-# For backwards compatibility and design separation, we alias all clients to the same master client
-guides_client = client
-scanner_client = client
+# For backwards compatibility and design separation
+client = or_client
+guides_client = or_client
+scanner_client = or_client
 
 # -----------------------------------------------------
 # Models
@@ -168,9 +115,6 @@ class NoticeAnalysisSchema(BaseModel):
 
 @router.post("/ai/match")
 async def match_schemes(profile: UserProfile):
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
-    
     # 1. Profile hashing and local caching
     try:
         profile_json = json.dumps(profile.model_dump(), sort_keys=True)
@@ -181,146 +125,101 @@ async def match_schemes(profile: UserProfile):
         profile_hash = None
         print(f"Warning: Hashing/Caching setup failed: {e}")
 
-    # 2. RAG Context Generation (Query Chroma database)
-    schemes_context = ""
-    has_more = False
-    try:
-        from rag_pipeline.rag import GeminiEmbeddings, DB_DIR
-        from langchain_community.vectorstores import Chroma
-        
-        embeddings = GeminiEmbeddings()
-        # Verify client key is available
-        if embeddings.client and embeddings.client.api_key:
-            vectorstore = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
-            search_query = f"Government schemes for state {profile.state}, age {profile.age}, occupation {profile.occupation}, category {profile.filterCategory or 'all'}, gender {profile.gender or 'all'}"
-            matching_docs = vectorstore.similarity_search(search_query, k=40)
-            
-            # De-duplicate documents
-            seen = set()
-            unique_docs = []
-            for doc in matching_docs:
-                name = doc.metadata.get('name')
-                if name and name not in seen:
-                    seen.add(name)
-                    unique_docs.append(doc)
-            
-            PAGE_SIZE = 10
-            start_idx = (profile.page - 1) * PAGE_SIZE
-            end_idx = start_idx + PAGE_SIZE
-            
-            sliced_docs = unique_docs[start_idx:end_idx]
-            has_more = end_idx < len(unique_docs)
-            
-            for doc in sliced_docs:
-                schemes_context += f"---\n{doc.page_content}\nMetadata: {json.dumps(doc.metadata)}\n"
-    except Exception as e:
-        print(f"Warning: Chroma vector DB search failed ({e}). Falling back to local dataset file.")
-        schemes_context = ""
-
-    # 3. Local SQLite Registry Fallback
-    if not schemes_context:
-        try:
-            import sys
-            parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-            if parent_dir not in sys.path:
-                sys.path.append(parent_dir)
-            from datasets.database import query_schemes
-            
-            target_state = profile.filterState if profile.filterState else profile.state
-            target_category = profile.filterCategory if profile.filterCategory else None
-            
-            target_schemes = query_schemes(state=target_state, category=target_category)
-            if not target_schemes:
-                # If no schemes matched with state filter, fall back to matching just by category or get all schemes
-                target_schemes = query_schemes(category=target_category)
-                
-            PAGE_SIZE = 10
-            start_idx = (profile.page - 1) * PAGE_SIZE
-            end_idx = start_idx + PAGE_SIZE
-            
-            sliced_schemes = target_schemes[start_idx:end_idx]
-            has_more = end_idx < len(target_schemes)
-            
-            for s in sliced_schemes:
-                schemes_context += (
-                    f"---\n"
-                    f"Scheme Name: {s.get('scheme_name')}\n"
-                    f"Category: {s.get('category')}\n"
-                    f"Eligibility: {s.get('eligibility')}\n"
-                    f"Benefits: {s.get('benefits')}\n"
-                    f"Required Documents: {', '.join(s.get('required_documents', []))}\n"
-                    f"Ministry: {s.get('ministry')}\n"
-                    f"Metadata: {json.dumps({'id': s.get('id'), 'name': s.get('scheme_name'), 'category': s.get('category'), 'officialWebsite': s.get('officialWebsite')})}\n"
-                )
-        except Exception as ex:
-            print(f"Warning: SQLite database fallback failed: {ex}")
-
-    # 4. Prompt Optimization for compact outputs
-    prompt = f"""
+    # 2. Web Search Grounding with Google Search
+    target_state = profile.filterState if (profile.filterState and profile.filterState != "All") else profile.state
+    target_category = profile.filterCategory if (profile.filterCategory and profile.filterCategory != "All") else "all categories"
+    
+    # Constructing a descriptive prompt for search grounding
+    prompt_step1 = f"""
     You are an expert Indian Government Scheme matching advisor.
-    Evaluate the Citizen profile below against the candidate government schemes provided in the Context.
+    Using Google Search, find active and real government schemes (central or state-level for {target_state}) that the citizen is eligible for.
     
     Citizen Profile:
-    Name: {profile.name}
-    Age: {profile.age}
-    Gender: {profile.gender}
-    Marital Status: {profile.marital_status}
-    Caste/Category: {profile.caste}
-    Disability: {profile.disability}
-    Education: {profile.education}
-    Occupation: {profile.occupation}
-    Income: ₹{profile.income}
-    State: {profile.state}
-    Land Holding: {profile.land_acres} acres
-
-    Context - Candidate Schemes (Page {profile.page}):
-    {schemes_context}
-
-    CRITICAL RULES:
-    1. Only return schemes from the Context above that the citizen is eligible for based on their profile criteria. Do not output any other schemes.
-    2. Keep the JSON field 'description' very short (maximum 1-2 brief sentences) stating the primary benefit and why the citizen qualifies.
-    3. Determine the 'id' field by matching it to the key in metadata (or slugify the scheme name, e.g., 'pm-kisan').
-    4. Provide the correct officialWebsite from the context.
-    5. Set the 'eligibilityScore' (70-100) based on criteria suitability.
+    - Age: {profile.age}
+    - State: {target_state}
+    - Occupation: {profile.occupation}
+    - Income: ₹{profile.income}
+    - Gender: {profile.gender or 'Not Specified'}
+    - Caste/Category: {profile.caste or 'General'}
+    - Disability: {profile.disability or 'No'}
+    - Education: {profile.education or 'Not Specified'}
+    - Land Holding: {profile.land_acres} acres
+    
+    Search for schemes specifically targeting this profile.
+    Retrieve at least 10 schemes if possible, representing various categories like Agriculture, Health, Education, Housing, Finance, etc.
+    
+    For each eligible scheme found, retrieve:
+    1. Scheme Name
+    2. Short description (1-2 sentences) of why they qualify and benefits
+    3. Category (e.g. Agriculture, Health, Education, Housing, Finance, etc.)
+    4. State Applicability (e.g. 'All' or specific state name like '{target_state}')
+    5. Official website URL (make sure it's the real government website ending in .gov.in if possible)
+    6. Estimated eligibility score (70-100) based on how well they fit.
+    
+    List them clearly in your response.
     """
 
     try:
-        import asyncio
-        # Invoke Gemini content generation with strict 15 seconds timeout
-        response = await asyncio.wait_for(
-            client.aio.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=RecommendationsList,
-                    temperature=0.2
-                ),
-            ),
-            timeout=15.0
+        # Invoke Step 1: Plain text generation with google search tool enabled
+        response_search = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[{"role": "user", "content": prompt_step1}],
+            tools=[{"type": "openrouter:web_search"}],
+            max_tokens=1500,
+            temperature=0.3
         )
-        data = json.loads(response.text)
+        search_text = response_search.choices[0].message.content
         
-        # Inject python-computed has_more flag
+        # Step 2: Parse into structured JSON format matching RecommendationsList schema
+        prompt_step2 = f"""
+        You are a data extraction assistant.
+        Below is a list of government schemes found via search for a citizen profile.
+        Extract the schemes and format them exactly matching the requested JSON schema.
+        
+        JSON schema structure:
+        {{
+            "schemes": [
+                {{
+                    "name": "Scheme Name",
+                    "description": "Short description of why they qualify and benefits",
+                    "eligibilityScore": 85,
+                    "category": "Agriculture",
+                    "stateApplicability": "All" or "State Name",
+                    "id": "slugified-id",
+                    "officialWebsite": "https://example.gov.in"
+                }}
+            ]
+        }}
+        
+        Search Results:
+        {search_text}
+        """
+        
+        response_parse = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[{"role": "user", "content": prompt_step2}],
+            response_format={"type": "json_object"},
+            max_tokens=1500,
+            temperature=0.1
+        )
+        
+        data = json.loads(response_parse.choices[0].message.content)
+        
+        # Inject has_more flag
         if isinstance(data, dict):
-            data["has_more"] = has_more
+            data["has_more"] = False
         
         # Save to memory cache
         if profile_hash and data:
             MATCHES_CACHE[profile_hash] = data
             
         return data
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="AI Recommendation request timed out. Trying next fallback key.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Recommendation failed: {str(e)}")
 
 
 @router.get("/ai/scheme/{scheme_name}")
 async def get_scheme_details(scheme_name: str):
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
-    
     sanitized_scheme_name = validate_alphanumeric_dashed(scheme_name, max_len=100)
     
     prompt = f"""
@@ -336,27 +235,19 @@ async def get_scheme_details(scheme_name: str):
     """
 
     try:
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3
-            ),
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=2000
         )
-        return {"markdown": response.text}
+        return {"markdown": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Details retrieval failed: {str(e)}")
 
 
 @router.get("/ai/document-guide/{document_name}")
 async def get_document_guide(document_name: str):
-    """
-    Returns an exhaustive semantic markdown guide for applying to or editing an Essential Document, 
-    using the distinct secondary API key.
-    """
-    if not guides_client:
-        raise HTTPException(status_code=500, detail="Secondary Gemini Guides client not initialized. Check API Key.")
-    
     sanitized_document_name = validate_alphanumeric_dashed(document_name, max_len=100)
     
     prompt = f"""
@@ -375,27 +266,19 @@ async def get_document_guide(document_name: str):
     """
 
     try:
-        response = await guides_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3
-            ),
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=1500
         )
-        return {"markdown": response.text}
+        return {"markdown": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ai/ocr")
 async def analyze_document(file: UploadFile = File(...)):
-    """
-    Analyzes an uploaded image using gemini-2.5-flash with a dedicated tertiary API key.
-    Extracts key information like Name, DOB, Address, and masks the ID numbers.
-    """
-    if not scanner_client:
-        raise HTTPException(status_code=500, detail="Tertiary Gemini Scanner client not initialized. Check API Key.")
-    
     validate_uploaded_file(
         file,
         allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -403,14 +286,8 @@ async def analyze_document(file: UploadFile = File(...)):
     )
     
     try:
-        # Read file bytes
         file_bytes = await file.read()
-        
-        # Prepare the part. (We assume image/jpeg or image/png, etc.)
-        doc_part = types.Part.from_bytes(
-            data=file_bytes,
-            mime_type=file.content_type
-        )
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
         
         prompt = """
         Analyze this legal or government document. It could be any official or legal document (Notice, Aadhaar, PAN, Court Order, Contract, Rejection Letter, etc.).
@@ -433,28 +310,35 @@ async def analyze_document(file: UploadFile = File(...)):
         Return the information as a clean, well-structured JSON with all the descriptive keys mentioned above.
         """
         
-        response = await scanner_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, doc_part],
-            config=types.GenerateContentConfig(
-                temperature=0.1,
-                response_mime_type="application/json"
-            ),
-        )
-        return {"extracted_text": response.text}
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{file.content_type or 'image/jpeg'};base64,{base64_data}"
+                        }
+                    }
+                ]
+            }
+        ]
         
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.DOCUMENT_VISION,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=2000
+        )
+        return {"extracted_text": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ai/detect-fraud")
 async def detect_document_fraud(file: UploadFile = File(...)):
-    """
-    Analyzes an uploaded document for potential fraud, scams, or forgery.
-    """
-    if not scanner_client:
-        raise HTTPException(status_code=500, detail="Tertiary Gemini Scanner client not initialized. Check API Key.")
-    
     validate_uploaded_file(
         file,
         allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -463,7 +347,7 @@ async def detect_document_fraud(file: UploadFile = File(...)):
     
     try:
         file_bytes = await file.read()
-        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=file.content_type)
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
         
         prompt = """
         You are an expert forensic document examiner and cybersecurity AI.
@@ -481,29 +365,35 @@ async def detect_document_fraud(file: UploadFile = File(...)):
         - "recommendation": Advice to the user on what to do next based on your findings.
         """
         
-        response = await scanner_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, doc_part],
-            config=types.GenerateContentConfig(
-                temperature=0.1,
-                response_mime_type="application/json"
-            ),
-        )
-        return {"fraud_analysis": response.text}
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{file.content_type or 'image/jpeg'};base64,{base64_data}"
+                        }
+                    }
+                ]
+            }
+        ]
         
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.DOCUMENT_VISION,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=1500
+        )
+        return {"fraud_analysis": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ai/extract-profile")
 async def extract_profile_from_id(file: UploadFile = File(...)):
-    """
-    Specifically extracts profile information (Name, Age, State, etc.) from an ID. 
-    Strictly returns a JSON object matching the frontend form data structure.
-    """
-    if not scanner_client:
-        raise HTTPException(status_code=500, detail="Scanner client not initialized.")
-    
     validate_uploaded_file(
         file,
         allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -512,7 +402,7 @@ async def extract_profile_from_id(file: UploadFile = File(...)):
 
     try:
         file_bytes = await file.read()
-        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=file.content_type)
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
         
         prompt = """
         Analyze this ID document (like Aadhaar, PAN, Voter ID, driving license, etc.).
@@ -537,17 +427,30 @@ async def extract_profile_from_id(file: UploadFile = File(...)):
         Return NOTHING else. No markdown wrappers. Just the JSON object.
         """
         
-        response = await scanner_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, doc_part],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                response_mime_type="application/json"
-            ),
-        )
-        data = json.loads(response.text)
-        return data
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{file.content_type or 'image/jpeg'};base64,{base64_data}"
+                        }
+                    }
+                ]
+            }
+        ]
         
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.DOCUMENT_VISION,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=1500
+        )
+        data = json.loads(response.choices[0].message.content)
+        return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Profile extraction failed: {str(e)}")
 
@@ -558,13 +461,6 @@ async def generate_document(
     document_context: str = Form(None),
     profile_context: str = Form(None)
 ):
-    """
-    Generates structured legal replies, RTIs, appeals, and official letters.
-    """
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini client not initialized.")
-        
-    # Input bounds check and escaping
     if not prompt_text or len(prompt_text) > 10000:
         raise HTTPException(status_code=400, detail="prompt_text length must be between 1 and 10000 characters.")
     sanitized_prompt_text = html.escape(prompt_text.strip())
@@ -604,15 +500,16 @@ async def generate_document(
         contents.append(f"User Profile details: {sanitized_profile_context}")
 
     try:
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.3
-            ),
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": "\n".join(contents)}
+            ],
+            temperature=0.3,
+            max_tokens=2500
         )
-        return {"markdown": response.text}
+        return {"markdown": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Document Generation failed: {str(e)}")
 
@@ -624,14 +521,6 @@ async def voice_assistant(
     profile_context: str = Form(None),
     document_context: str = Form(None)
 ):
-    """
-    1. Accepts a raw audio file (.webm/.wav) OR a text transcript.
-    2. Sends the content natively to gemini-2.5-flash for multimodal processing.
-    3. Handles Legal, Procedural, Application Status, and general questions.
-    """
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini client not initialized. Check API Key.")
-    
     sanitized_transcript = ""
     if transcript:
         if len(transcript) > 5000:
@@ -664,9 +553,8 @@ async def voice_assistant(
         system_instruction += f"\n\nContext - Extracted info from user's recently uploaded document: {sanitized_document_context}"
     
     try:
-        contents = []
+        user_content = []
         if audio and audio.filename:
-            # Validate uploaded audio file
             validate_uploaded_file(
                 audio,
                 allowed_mimes=[
@@ -676,33 +564,42 @@ async def voice_assistant(
                 max_size_bytes=5 * 1024 * 1024  # 5MB limit for voice files
             )
             file_bytes = await audio.read()
-            contents.append(types.Part.from_bytes(data=file_bytes, mime_type=audio.content_type or 'audio/webm'))
+            base64_audio = base64.b64encode(file_bytes).decode("utf-8")
+            
+            fmt = "wav"
+            if audio.content_type and "mp3" in audio.content_type:
+                fmt = "mp3"
+            elif audio.content_type and "webm" in audio.content_type:
+                fmt = "webm"
+                
+            user_content.append({
+                "type": "input_audio",
+                "input_audio": {
+                    "data": base64_audio,
+                    "format": fmt
+                }
+            })
         elif sanitized_transcript:
-            contents.append(sanitized_transcript)
+            user_content.append({"type": "text", "text": sanitized_transcript})
         else:
             raise HTTPException(status_code=400, detail="No valid audio file or text transcript provided.")
 
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.5
-            ),
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.VOICE_PERCEPTION,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.5,
+            max_tokens=1000
         )
-        return {"reply": response.text}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Voice processing failed: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"AI Voice processing failed: {str(e)}")
 
 
 @router.post("/ai/analyze-notice")
 async def analyze_notice(file: UploadFile = File(...)):
-    """
-    Resilient notice analyzer with security validation.
-    """
-    if not scanner_client:
-        raise HTTPException(status_code=500, detail="Scanner client not initialized.")
-    
     validate_uploaded_file(
         file,
         allowed_mimes=["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -711,6 +608,7 @@ async def analyze_notice(file: UploadFile = File(...)):
     
     try:
         file_bytes = await file.read()
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
         
         # Defensive MIME type resolution
         mime_type = file.content_type
@@ -726,27 +624,48 @@ async def analyze_notice(file: UploadFile = File(...)):
             else:
                 mime_type = "image/jpeg"
                 
-        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
-        
         prompt = """
         You are an expert Indian Legal Aid AI. Analyze this uploaded legal or official notice.
         Extract the values matching the requested schema.
+        
+        JSON schema structure:
+        {
+            "notice_type": "type of notice",
+            "sender": "sender",
+            "recipient": "recipient",
+            "key_dates": "important dates",
+            "summary": "concise summary",
+            "required_action": "action required",
+            "severity": "High/Medium/Low"
+        }
         """
         
-        response = await scanner_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, doc_part],
-            config=types.GenerateContentConfig(
-                temperature=0.1,
-                max_output_tokens=1500,  # Optimize speed by limiting output token length
-                response_mime_type="application/json",
-                response_schema=NoticeAnalysisSchema
-            ),
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{base64_data}"
+                        }
+                    }
+                ]
+            }
+        ]
+        
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.DOCUMENT_VISION,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=2000
         )
         try:
-            parsed_analysis = json.loads(response.text)
+            parsed_analysis = json.loads(response.choices[0].message.content)
         except Exception:
-            parsed_analysis = response.text
+            parsed_analysis = response.choices[0].message.content
         return {"analysis": parsed_analysis}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -757,12 +676,6 @@ async def chat_notice(
     question: str = Form(...),
     notice_context: str = Form(...)
 ):
-    """
-    Allows the user to chat with the AI about the uploaded notice.
-    """
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini client not initialized.")
-    
     if not question or len(question) > 5000:
         raise HTTPException(status_code=400, detail="question length must be between 1 and 5000 characters.")
     sanitized_question = html.escape(question.strip())
@@ -783,14 +696,13 @@ async def chat_notice(
     """
     
     try:
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3
-            ),
+        response = or_client.chat.completions.create(
+            model=OmniGovModels.LEGAL_REASONING,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=2000
         )
-        return {"reply": response.text}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Chat failed: {str(e)}")
 

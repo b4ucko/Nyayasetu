@@ -18,6 +18,7 @@ export default function ProfileBuilder() {
   const { user } = useAuth();
   const [profile, setProfile] = useState({ age: '', income: '', occupation: '', state: '', gender: '', marital_status: '', caste: '', disability: 'No', education: '' });
   const [loading, setLoading] = useState(false);
+  const [preloading, setPreloading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState({});
   const [extracting, setExtracting] = useState(false);
@@ -293,6 +294,7 @@ export default function ProfileBuilder() {
     if (!validate()) return;
 
     setLoading(true);
+    setPreloading(false);
     setErrors({});
     try {
       const { error } = await supabase
@@ -312,14 +314,44 @@ export default function ProfileBuilder() {
         
       if (error) throw error;
       
+      setPreloading(true);
+      // Preload 10 schemes from backend using search grounding
+      const payload = {
+        name: user.email ? user.email.split('@')[0] : "Citizen",
+        age: Number(profile.age),
+        occupation: profile.occupation,
+        income: Number(profile.income),
+        state: profile.state,
+        land_acres: 0.0,
+        gender: profile.gender || "",
+        marital_status: profile.marital_status || "",
+        caste: profile.caste || "",
+        disability: profile.disability || "No",
+        education: profile.education || "",
+        filterCategory: "All",
+        filterState: "All",
+        page: 1
+      };
+      
+      try {
+        const response = await axios.post('http://localhost:8000/api/ai/match', payload, { timeout: 120000 });
+        if (response.data && response.data.schemes) {
+          localStorage.setItem(`omnigov_schemes_${user.id}`, JSON.stringify(response.data.schemes));
+        }
+      } catch (err) {
+        console.warn("Failed to preload schemes:", err);
+      }
+      
       setSuccess(true);
       setIsEditing(false);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error("Error saving profile:", error);
       setErrors({ submit: error.message || "Failed to save profile. Please try again." });
+    } finally {
+      setLoading(false);
+      setPreloading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -673,7 +705,7 @@ export default function ProfileBuilder() {
             {isEditing ? (
               <div className="flex flex-col sm:flex-row gap-4 mt-6">
                 <button type="submit" disabled={loading} className="w-full sm:flex-1 bg-govblue text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-md">
-                  {loading ? 'Saving Profile...' : 'Save Profile Details'}
+                  {loading ? (preloading ? 'Preloading Schemes...' : 'Saving Profile...') : 'Save Profile Details'}
                 </button>
                 <button type="button" onClick={() => setIsEditing(false)} className="w-full sm:flex-1 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors shadow-md">
                   Cancel

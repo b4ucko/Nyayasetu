@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL_PLACEHOLDER'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_PLACEHOLDER'
+const rawUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const supabaseUrl = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) 
+  ? rawUrl 
+  : 'https://placeholder.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.placeholder'
 
 const customStorage = {
   getItem: (key) => {
