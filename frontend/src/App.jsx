@@ -210,7 +210,7 @@ function App() {
               <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden border border-slate-200">
                 <button
                   onClick={() => setVoiceBotOpen(false)}
-                  className="absolute top-6 right-6 text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors z-[110] flex items-center shadow-sm bg-white border border-slate-200"
+                  className="absolute top-6 right-6 text-red-500 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors z-[110] flex items-center shadow-sm bg-white border border-slate-200"
                   title="Close Voice Assistant"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

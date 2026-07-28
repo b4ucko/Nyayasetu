@@ -418,9 +418,9 @@ export default function NoticeChecker() {
                           <Bot className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-2">
-                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
+                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
                         </div>
                      </div>
                    )}

@@ -491,8 +491,8 @@ If you need any other help, type "menu" to choose another option.`;
     // Create a temporary element to hold the formatted document for PDF generation
     const element = document.createElement('div');
     element.innerHTML = `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; padding: 30px; color: #000;">
-        <pre style="font-family: Arial, sans-serif; white-space: pre-wrap; word-wrap: break-word;">${generatedDoc}</pre>
+      <div style="font-size: 14px; line-height: 1.6; padding: 30px; color: #000;">
+        <pre style="white-space: pre-wrap; word-wrap: break-word;">${generatedDoc}</pre>
       </div>
     `;
     
@@ -677,7 +677,7 @@ If you need any other help, type "menu" to choose another option.`;
       <button 
         style={{ transform: `translateY(-${offset}px)` }}
         onClick={() => { setIsOpen(true); }}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-govblue to-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl hover:scale-110 hover:shadow-blue-500/50 transition-transform duration-200 z-50 group animate-bounce-slow"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-govblue to-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl hover:scale-110 hover:shadow-blue-500/50 transition-transform duration-200 z-50 group"
       >
         <Bot className="w-8 h-8 group-hover:block transition-all" />
         <span className="absolute -top-1 -right-1 bg-red-500 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900"></span>

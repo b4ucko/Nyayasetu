@@ -50,7 +50,7 @@ export default function DashboardOverview({ userProfile, schemes }) {
         <div className="absolute right-0 top-0 w-64 h-64 bg-govblue/10 dark:bg-govblue/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
         <div className="relative z-10 flex-1">
           <h2 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight transition-colors">
-            Welcome back, <span className="bg-clip-text text-transparent bg-gradient-to-r from-govblue to-govorange">{userProfile.name}</span>!
+            Welcome back, <span className="text-govblue font-bold">{userProfile.name}</span>!
           </h2>
           <p className="text-slate-600 dark:text-slate-300 font-medium mt-2 flex items-center transition-colors">
             <Zap className="w-4 h-4 text-govorange mr-2" /> Agentic Assessment scanned <strong className="mx-1 text-slate-800 dark:text-white">140+</strong> active policies for you.
@@ -177,7 +177,7 @@ export default function DashboardOverview({ userProfile, schemes }) {
                   
                   {loadingSteps ? (
                     <div className="flex flex-col items-center py-12">
-                       <Zap className="w-8 h-8 text-govorange animate-bounce mb-3" />
+                       <Zap className="w-8 h-8 text-govorange animate-pulse mb-3" />
                        <p className="text-slate-300 text-sm font-medium animate-pulse">Agent is generating instructions...</p>
                     </div>
                   ) : (

@@ -58,7 +58,7 @@ export default function HelpCenter() {
       {/* Header section */}
       <div className="text-center mb-16">
         <h1 className="text-5xl font-black text-slate-900 dark:text-white mb-6">
-          How can we <span className="bg-gradient-to-r from-govblue to-indigo-500 text-transparent bg-clip-text">help you?</span>
+          How can we <span className="text-govblue font-bold">help you?</span>
         </h1>
         <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8 font-medium">
           Search our knowledge base or browse categories below to find answers to your questions.
