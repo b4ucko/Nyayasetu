@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useNavigate } from 'react-router-dom';
 import { Search, FileText, Scale, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
 
-// --- TRUE 3D Materials (High Contrast) ---
+// --- TRUE 3D Materials (High Contrast & PBR) ---
 const leatherMaterial = new THREE.MeshStandardMaterial({
   color: '#3d1c04', // Deep leather brown
   roughness: 0.6,
@@ -28,24 +28,49 @@ const woodMaterial = new THREE.MeshStandardMaterial({
 
 const goldMaterial = new THREE.MeshStandardMaterial({
   color: '#ffbf00',
-  roughness: 0.1,
-  metalness: 1.0, // Full metal for true 3D reflections
+  roughness: 0.15,
+  metalness: 0.95,
 });
 
-// --- 3D Objects ---
+const brassMaterial = new THREE.MeshStandardMaterial({
+  color: '#d4af37',
+  roughness: 0.2,
+  metalness: 0.8,
+});
 
+const waxRedMaterial = new THREE.MeshStandardMaterial({
+  color: '#990000',
+  roughness: 0.4,
+  metalness: 0.2,
+});
+
+const steelMaterial = new THREE.MeshStandardMaterial({
+  color: '#94a3b8',
+  roughness: 0.2,
+  metalness: 0.9,
+});
+
+const emeraldGlowMaterial = new THREE.MeshStandardMaterial({
+  color: '#10b981',
+  emissive: '#059669',
+  emissiveIntensity: 0.6,
+  roughness: 0.2,
+  metalness: 0.5,
+});
+
+
+// --- 1. Flipping Law Book Component ---
 function LawBook() {
   const group = useRef();
   const pagesGroup = useRef();
   const scroll = useScroll();
 
-  // Create an array of pages
   const numPages = 15;
   const pages = useMemo(() => {
-    return Array.from({ length: numPages }).map((_, i) => {
-      // Each page needs a slightly different rotation speed/trigger point
-      return { id: i, targetRotation: Math.PI - 0.1 };
-    });
+    return Array.from({ length: numPages }).map((_, i) => ({
+      id: i,
+      targetRotation: Math.PI - 0.1
+    }));
   }, [numPages]);
 
   const pageRefs = useRef([]);
@@ -54,30 +79,24 @@ function LawBook() {
     const offset = scroll.offset; // 0 to 1
 
     // Book positioning: Starts bottom right, floats up and rotates open
-    group.current.position.x = THREE.MathUtils.lerp(3, -4, offset);
-    group.current.position.y = THREE.MathUtils.lerp(-4, 2, offset);
+    group.current.position.x = THREE.MathUtils.lerp(3.5, -4.5, offset);
+    group.current.position.y = THREE.MathUtils.lerp(-3.5, 1.5, offset);
     group.current.position.z = THREE.MathUtils.lerp(0, -2, offset);
     
-    // Book rotation (spins slightly as it moves)
+    // Book rotation
     group.current.rotation.x = THREE.MathUtils.lerp(0.5, 0.2, offset);
     group.current.rotation.y = THREE.MathUtils.lerp(-0.5, 0.5, offset);
     group.current.rotation.z = THREE.MathUtils.lerp(0, -0.1, offset);
 
     // Flipping pages logic
-    // The scroll offset dictates how many pages have flipped
-    const flipProgress = offset * 2.0; // scales up so pages flip during the middle of the scroll
+    const flipProgress = offset * 2.2;
     
     pageRefs.current.forEach((page, i) => {
       if (!page) return;
-      // Calculate individual page flip threshold based on its index
       const threshold = (i / numPages);
-      
-      // If scroll progress is past this page's threshold, flip it
       if (flipProgress > threshold) {
-        // Smoothly rotate to PI (180 degrees)
         page.rotation.y = THREE.MathUtils.lerp(page.rotation.y, Math.PI - 0.05 * i, 0.1);
       } else {
-        // Rest at 0 (or slightly offset for thickness)
         page.rotation.y = THREE.MathUtils.lerp(page.rotation.y, 0.05 * i, 0.1);
       }
     });
@@ -86,7 +105,7 @@ function LawBook() {
   return (
     <group ref={group}>
       <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-        {/* Book Cover (Back spine and back cover) */}
+        {/* Book Back Cover */}
         <mesh material={leatherMaterial} position={[0, -0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[3.2, 0.2, 4.2]} />
         </mesh>
@@ -96,23 +115,21 @@ function LawBook() {
           <cylinderGeometry args={[0.4, 0.4, 4.2, 16, 1, false, 0, Math.PI]} />
         </mesh>
 
-        {/* Flipping Pages (Anchored at the spine: x = -1.5) */}
+        {/* Flipping Pages */}
         <group ref={pagesGroup} position={[-1.5, 0.1, 0]}>
           {pages.map((p, i) => (
             <group key={p.id} ref={el => pageRefs.current[i] = el}>
-              {/* The actual page mesh offset so it rotates around the spine hinge */}
               <mesh material={paperMaterial} position={[1.5, 0, 0]} castShadow receiveShadow>
                 <boxGeometry args={[3.0, 0.02, 4.0]} />
               </mesh>
             </group>
           ))}
-          {/* Static block of unflipped pages to give thickness */}
           <mesh material={paperMaterial} position={[1.5, 0.2, 0]} castShadow receiveShadow>
              <boxGeometry args={[2.9, 0.4, 3.9]} />
           </mesh>
         </group>
         
-        {/* Front Cover (Static, attached to the spine) */}
+        {/* Front Cover */}
         <group position={[-1.5, 0.7, 0]} rotation={[0, 0, -0.1]}>
           <mesh material={leatherMaterial} position={[1.6, 0, 0]} castShadow receiveShadow>
             <boxGeometry args={[3.2, 0.1, 4.2]} />
@@ -126,6 +143,8 @@ function LawBook() {
   );
 }
 
+
+// --- 2. Scales of Justice Component ---
 function ScalesOfJustice() {
   const group = useRef();
   const beam = useRef();
@@ -135,14 +154,14 @@ function ScalesOfJustice() {
     const time = state.clock.getElapsedTime();
     const offset = scroll.offset;
 
-    // Starts in background, moves into view
-    group.current.position.x = THREE.MathUtils.lerp(-8, 5, offset);
-    group.current.position.y = THREE.MathUtils.lerp(5, 0, offset);
-    group.current.position.z = THREE.MathUtils.lerp(-10, -5, offset);
+    // Starts top right, floats into feature area
+    group.current.position.x = THREE.MathUtils.lerp(-7, 5.2, offset);
+    group.current.position.y = THREE.MathUtils.lerp(4, 0.5, offset);
+    group.current.position.z = THREE.MathUtils.lerp(-8, -4, offset);
     
-    group.current.rotation.y = THREE.MathUtils.lerp(0, -Math.PI / 4, offset);
+    group.current.rotation.y = THREE.MathUtils.lerp(0, -Math.PI / 3, offset);
     
-    // Strong tipping motion
+    // Tipping motion
     beam.current.rotation.z = Math.sin(time * 0.8) * 0.15;
   });
 
@@ -190,7 +209,192 @@ function ScalesOfJustice() {
   );
 }
 
-// --- HTML Content Overlay (Restored Full Features) ---
+
+// --- 3. NEW UNIQUE OBJECT: Stamping Wax Seal (Presses Down on Scroll) ---
+function StampingWaxSeal() {
+  const group = useRef();
+  const stampHandle = useRef();
+  const waxEmblem = useRef();
+  const scroll = useScroll();
+
+  useFrame((state) => {
+    const offset = scroll.offset; // 0 to 1
+    const time = state.clock.getElapsedTime();
+
+    // Activates in middle section (offset 0.25 to 0.65)
+    // Moves from right margin into view
+    group.current.position.x = THREE.MathUtils.lerp(6, -5.5, offset);
+    group.current.position.y = THREE.MathUtils.lerp(-6, -1, offset);
+    group.current.position.z = THREE.MathUtils.lerp(-5, -2, offset);
+    group.current.rotation.y = THREE.MathUtils.lerp(0.2, 0.6, offset);
+
+    // Stamping animation curve: descends, presses hard, then lifts slightly
+    const stampProgress = THREE.MathUtils.clamp((offset - 0.25) * 3, 0, 1);
+    
+    if (stampProgress > 0 && stampProgress < 0.8) {
+      // Descends and stamps onto document
+      stampHandle.current.position.y = THREE.MathUtils.lerp(3.5, 0.35, stampProgress * 1.25);
+    } else if (stampProgress >= 0.8) {
+      // Lifts back up slightly after stamping
+      stampHandle.current.position.y = THREE.MathUtils.lerp(0.35, 1.2, (stampProgress - 0.8) * 5);
+    }
+
+    // Reveal glowing seal badge after stamp strikes
+    if (stampProgress > 0.5) {
+      waxEmblem.current.scale.x = THREE.MathUtils.lerp(waxEmblem.current.scale.x, 1, 0.1);
+      waxEmblem.current.scale.y = THREE.MathUtils.lerp(waxEmblem.current.scale.y, 1, 0.1);
+      waxEmblem.current.scale.z = THREE.MathUtils.lerp(waxEmblem.current.scale.z, 1, 0.1);
+      waxEmblem.current.rotation.z = time * 0.5; // rotates smoothly once stamped!
+    } else {
+      waxEmblem.current.scale.set(0.01, 0.01, 0.01);
+    }
+  });
+
+  return (
+    <group ref={group}>
+      <Float speed={1.2} rotationIntensity={0.1} floatIntensity={0.3}>
+        {/* Floating Certificate Plate */}
+        <mesh material={paperMaterial} position={[0, -0.05, 0]} castShadow receiveShadow>
+          <boxGeometry args={[3.5, 0.1, 4.5]} />
+        </mesh>
+        
+        {/* Certificate Header Ribbons */}
+        <mesh material={goldMaterial} position={[0, 0.01, -1.8]} castShadow>
+          <boxGeometry args={[3.0, 0.02, 0.4]} />
+        </mesh>
+
+        {/* Stamped Wax Seal Emblem (Revealed on Stamp) */}
+        <group ref={waxEmblem} position={[0, 0.08, 0.8]} scale={[0.01, 0.01, 0.01]}>
+          <mesh material={waxRedMaterial} castShadow>
+             <cylinderGeometry args={[0.9, 0.9, 0.12, 32]} />
+          </mesh>
+          <mesh material={goldMaterial} position={[0, 0.08, 0]} castShadow>
+             <cylinderGeometry args={[0.7, 0.7, 0.05, 32]} />
+          </mesh>
+          {/* Star symbol inside seal */}
+          <mesh material={emeraldGlowMaterial} position={[0, 0.12, 0]} castShadow>
+             <boxGeometry args={[0.4, 0.05, 0.4]} />
+          </mesh>
+        </group>
+
+        {/* The Stamp Handle (Descends on Scroll) */}
+        <group ref={stampHandle} position={[0, 3.5, 0.8]}>
+          {/* Handle Knob */}
+          <mesh material={woodMaterial} position={[0, 2.2, 0]} castShadow>
+            <sphereGeometry args={[0.6, 32, 32]} />
+          </mesh>
+          {/* Stem */}
+          <mesh material={woodMaterial} position={[0, 1.2, 0]} castShadow>
+            <cylinderGeometry args={[0.3, 0.45, 1.4, 32]} />
+          </mesh>
+          {/* Brass Metal Base Stamp Head */}
+          <mesh material={brassMaterial} position={[0, 0.3, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.85, 0.95, 0.5, 32]} />
+          </mesh>
+        </group>
+      </Float>
+    </group>
+  );
+}
+
+
+// --- 4. NEW UNIQUE OBJECT: Unlocking Security Key & Padlock (Unlocks on Scroll) ---
+function UnlockingPadlock() {
+  const group = useRef();
+  const shackle = useRef();
+  const key = useRef();
+  const glowRing = useRef();
+  const scroll = useScroll();
+
+  useFrame((state) => {
+    const offset = scroll.offset; // 0 to 1
+    const time = state.clock.getElapsedTime();
+
+    // Activates in bottom section (How it Works / Security - offset 0.55 to 0.95)
+    group.current.position.x = THREE.MathUtils.lerp(-6, 4.5, offset);
+    group.current.position.y = THREE.MathUtils.lerp(-4, -0.5, offset);
+    group.current.position.z = THREE.MathUtils.lerp(-6, -2, offset);
+    
+    group.current.rotation.y = THREE.MathUtils.lerp(-0.4, 0.3, offset);
+
+    // Unlocking sequence trigger: offset > 0.7
+    const unlockProgress = THREE.MathUtils.clamp((offset - 0.65) * 3.5, 0, 1);
+
+    // 1. Key slides forward into keyhole
+    key.current.position.z = THREE.MathUtils.lerp(3.0, 0.6, unlockProgress);
+
+    // 2. Key turns 90 degrees
+    key.current.rotation.z = THREE.MathUtils.lerp(0, Math.PI / 2, unlockProgress);
+
+    // 3. Shackle pops open vertically!
+    shackle.current.position.y = THREE.MathUtils.lerp(1.4, 2.2, unlockProgress);
+    shackle.current.rotation.y = THREE.MathUtils.lerp(0, 0.5, unlockProgress);
+
+    // 4. Glow ring rotates when fully unlocked
+    if (unlockProgress > 0.8) {
+      glowRing.current.scale.set(1.1 + Math.sin(time * 3) * 0.1, 1.1 + Math.sin(time * 3) * 0.1, 1.1);
+    } else {
+      glowRing.current.scale.set(0.01, 0.01, 0.01);
+    }
+  });
+
+  return (
+    <group ref={group}>
+      <Float speed={1.5} rotationIntensity={0.15} floatIntensity={0.4}>
+        
+        {/* Padlock Base Body */}
+        <mesh material={goldMaterial} position={[0, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[2.4, 2.2, 1.0]} />
+        </mesh>
+        
+        {/* Keyhole Plate */}
+        <mesh material={steelMaterial} position={[0, -0.2, 0.51]} castShadow>
+          <cylinderGeometry args={[0.3, 0.3, 0.05, 32]} rotation={[Math.PI / 2, 0, 0]} />
+        </mesh>
+
+        {/* Dynamic Unlocking Shackle (Pops up on scroll) */}
+        <group ref={shackle} position={[0, 1.4, 0]}>
+          {/* U-shaped arch shackle built with torus / cylinders */}
+          <mesh material={steelMaterial} position={[0, 0.6, 0]} rotation={[0, 0, 0]} castShadow>
+             <torusGeometry args={[0.75, 0.18, 16, 32, Math.PI]} />
+          </mesh>
+          <mesh material={steelMaterial} position={[-0.75, 0, 0]} castShadow>
+             <cylinderGeometry args={[0.18, 0.18, 1.2, 16]} />
+          </mesh>
+          <mesh material={steelMaterial} position={[0.75, 0, 0]} castShadow>
+             <cylinderGeometry args={[0.18, 0.18, 1.2, 16]} />
+          </mesh>
+        </group>
+
+        {/* 3D Golden Key (Enters and Turns on Scroll) */}
+        <group ref={key} position={[0, -0.2, 3.0]}>
+          {/* Key Bow / Ring */}
+          <mesh material={brassMaterial} position={[0, 0, 1.2]} castShadow>
+             <torusGeometry args={[0.4, 0.1, 16, 32]} />
+          </mesh>
+          {/* Key Shaft */}
+          <mesh material={brassMaterial} position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+             <cylinderGeometry args={[0.08, 0.08, 1.2, 16]} />
+          </mesh>
+          {/* Key Bit (Notches) */}
+          <mesh material={brassMaterial} position={[0.15, -0.1, 0.1]} castShadow>
+             <boxGeometry args={[0.25, 0.2, 0.3]} />
+          </mesh>
+        </group>
+
+        {/* Security Verified Emerald Glow Aura (Flares when unlocked) */}
+        <mesh ref={glowRing} position={[0, 0, -0.1]}>
+          <torusGeometry args={[1.6, 0.05, 16, 32]} />
+          <meshBasicMaterial color="#10b981" />
+        </mesh>
+
+      </Float>
+    </group>
+  );
+}
+
+
+// --- HTML Content Overlay (Full Features Layout) ---
 function HtmlContent() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,10 +410,9 @@ function HtmlContent() {
     <Scroll html style={{ width: '100%' }}>
       <div className="w-full text-slate-900 overflow-x-hidden">
         
-        {/* Search Hero Section (Restored & Enhanced) */}
+        {/* Search Hero Section */}
         <section className="relative w-full min-h-[90vh] flex flex-col justify-center py-20">
           <div className="container mx-auto px-6 max-w-5xl relative z-10 pointer-events-auto">
-            {/* Added a subtle blur backing to make text pop against 3D objects */}
             <div className="bg-white/70 backdrop-blur-md p-10 md:p-16 rounded-[3rem] border border-white/60 shadow-2xl">
               <div className="text-center">
                 <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6 font-serif leading-tight">
@@ -249,7 +452,7 @@ function HtmlContent() {
           </div>
         </section>
 
-        {/* Pathways / Action Cards (Restored) */}
+        {/* Pathways / Action Cards */}
         <section className="py-24 relative pointer-events-auto">
           <div className="container mx-auto px-6 max-w-7xl relative z-10">
             <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-12 font-serif text-center bg-white/60 backdrop-blur-sm inline-block px-8 py-3 rounded-full border border-white/50 shadow-sm">
@@ -301,7 +504,7 @@ function HtmlContent() {
           </div>
         </section>
 
-        {/* How it Works Stepper (Restored) */}
+        {/* How it Works Stepper */}
         <section className="py-24 relative pointer-events-auto">
           <div className="container mx-auto px-6 max-w-5xl relative z-10">
             <div className="bg-white/90 backdrop-blur-xl rounded-[3rem] p-12 md:p-20 shadow-2xl border border-white/50 text-center">
@@ -309,7 +512,6 @@ function HtmlContent() {
               <p className="text-xl text-slate-600 mb-16">A secure, streamlined process to advocate for your rights.</p>
 
               <div className="flex flex-col md:flex-row justify-between relative">
-                {/* Desktop connecting line */}
                 <div className="hidden md:block absolute top-8 left-[15%] right-[15%] h-1 bg-slate-200 -z-10 rounded-full"></div>
                 
                 {[
@@ -346,10 +548,6 @@ function HtmlContent() {
 export default function ScrollExperience() {
   return (
     <div className="w-full h-screen bg-[#e8ecef] overflow-hidden">
-      {/* 
-        We use a standard scrollbar via pages={3} but we map the HTML 
-        over the canvas so the user can scroll through the real content.
-      */}
       <Canvas
         shadows
         camera={{ position: [0, 0, 12], fov: 45 }}
@@ -357,7 +555,7 @@ export default function ScrollExperience() {
       >
         <color attach="background" args={['#e8ecef']} />
         
-        {/* TRUE 3D LIGHTING: High contrast, stark shadows */}
+        {/* TRUE 3D LIGHTING */}
         <ambientLight intensity={0.5} />
         
         <directionalLight 
@@ -385,17 +583,18 @@ export default function ScrollExperience() {
         <Environment preset="studio" />
 
         <ScrollControls pages={3} damping={0.2} distance={1.2}>
-          {/* Dynamic 3D Objects that react to the scroll */}
+          {/* Dynamic Interactive 3D Objects */}
           <Scroll>
             <LawBook />
             <ScalesOfJustice />
+            <StampingWaxSeal />
+            <UnlockingPadlock />
           </Scroll>
 
-          {/* The restored, full-featured HTML layout */}
+          {/* Full Featured HTML Overlay */}
           <HtmlContent />
         </ScrollControls>
         
-        {/* Floor to catch shadows and ground the scene */}
         <ContactShadows position={[0, -6, 0]} opacity={0.4} scale={50} blur={2} far={10} />
       </Canvas>
     </div>
