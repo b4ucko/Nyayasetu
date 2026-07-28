@@ -1,9 +1,9 @@
 import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, ScrollControls, Scroll, useScroll, Float, Lightformer, Text } from '@react-three/drei';
+import { Environment, ScrollControls, Scroll, useScroll, Float, Lightformer } from '@react-three/drei';
 import * as THREE from 'three';
 import { useNavigate } from 'react-router-dom';
-import { Search, FileText, Scale, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Scale, ShieldCheck, ArrowRight } from 'lucide-react';
 
 // --- Premium Materials ---
 const woodMaterial = new THREE.MeshPhysicalMaterial({
@@ -44,26 +44,25 @@ function CourthousePillars() {
   const scroll = useScroll();
 
   useFrame(() => {
-    // Pillars move up rapidly as we scroll to give a sense of falling/descending
-    group.current.position.y = THREE.MathUtils.lerp(0, 15, scroll.offset);
+    // Parallax effect: moving up as user scrolls down
+    group.current.position.y = THREE.MathUtils.lerp(0, 10, scroll.offset);
   });
 
   return (
     <group ref={group}>
-      {/* Foreground Left */}
-      <mesh material={marbleMaterial} position={[-4, -5, 5]} castShadow receiveShadow>
+      {/* Pushed far out to frame the scene, not block the text */}
+      <mesh material={marbleMaterial} position={[-7, -5, 2]} castShadow receiveShadow>
         <cylinderGeometry args={[0.8, 0.8, 20, 32]} />
       </mesh>
-      {/* Foreground Right */}
-      <mesh material={marbleMaterial} position={[4, -5, 5]} castShadow receiveShadow>
+      <mesh material={marbleMaterial} position={[7, -5, 2]} castShadow receiveShadow>
         <cylinderGeometry args={[0.8, 0.8, 20, 32]} />
       </mesh>
-      {/* Background Left */}
-      <mesh material={marbleMaterial} position={[-8, -5, -10]} castShadow receiveShadow>
+      
+      {/* Background Pillars */}
+      <mesh material={marbleMaterial} position={[-12, -5, -8]} castShadow receiveShadow>
         <cylinderGeometry args={[1.5, 1.5, 30, 32]} />
       </mesh>
-      {/* Background Right */}
-      <mesh material={marbleMaterial} position={[8, -5, -10]} castShadow receiveShadow>
+      <mesh material={marbleMaterial} position={[12, -5, -8]} castShadow receiveShadow>
         <cylinderGeometry args={[1.5, 1.5, 30, 32]} />
       </mesh>
     </group>
@@ -74,27 +73,24 @@ function FloatingDocuments() {
   const group = useRef();
   const scroll = useScroll();
 
-  // Create random documents
+  // Create documents further back and wider so they don't clip the center text
   const docs = useMemo(() => {
-    return Array.from({ length: 12 }).map(() => ({
+    return Array.from({ length: 15 }).map(() => ({
       position: [
-        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 20, // Wider spread
         (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 10 - 5
+        -5 - Math.random() * 10 // Pushed back further
       ],
       rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
       speed: Math.random() * 2 + 1
     }));
   }, []);
 
-  useFrame((state) => {
+  useFrame(() => {
     const offset = scroll.offset;
-    
-    // Rotate the whole storm of documents based on scroll
-    group.current.rotation.y = offset * Math.PI;
+    group.current.rotation.y = offset * Math.PI * 0.5;
     group.current.position.y = offset * 5;
 
-    // Individually wobble them
     group.current.children.forEach((child, i) => {
       child.rotation.x += 0.002 * docs[i].speed;
       child.rotation.y += 0.003 * docs[i].speed;
@@ -108,7 +104,6 @@ function FloatingDocuments() {
           <mesh material={paperMaterial} castShadow receiveShadow>
             <boxGeometry args={[1.5, 2.1, 0.02]} />
           </mesh>
-          {/* Abstract Text Lines on the document */}
           <mesh material={woodMaterial} position={[0, 0.5, 0.015]}>
             <boxGeometry args={[1.0, 0.05, 0.01]} />
           </mesh>
@@ -133,16 +128,19 @@ function ScalesOfJustice() {
     const time = state.clock.getElapsedTime();
     const offset = scroll.offset;
 
-    // Bring scales forward and fade them down on scroll
-    group.current.position.z = THREE.MathUtils.lerp(-15, -5, offset);
-    group.current.position.y = THREE.MathUtils.lerp(3, -5, offset);
+    // The Scales should be prominent on Page 2 (offset ~0.5), positioned on the LEFT 
+    // to balance the text on the RIGHT.
+    // Start deep background right, move to mid-ground left.
+    group.current.position.x = THREE.MathUtils.lerp(5, -4, offset * 2);
+    group.current.position.z = THREE.MathUtils.lerp(-20, -8, offset);
+    group.current.position.y = THREE.MathUtils.lerp(5, -2, offset);
     
-    // Slowly tip the scales based on scroll to signify balancing justice
-    beam.current.rotation.z = Math.sin(time * 0.5) * 0.1 + (offset * 0.5);
+    // Tipping motion
+    beam.current.rotation.z = Math.sin(time * 0.5) * 0.1 + (offset * 0.2);
   });
 
   return (
-    <group ref={group} position={[0, 3, -15]}>
+    <group ref={group} position={[5, 5, -20]}>
       <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.5}>
         {/* Base and Pillar */}
         <mesh material={goldMaterial} position={[0, -3, 0]} castShadow>
@@ -163,7 +161,6 @@ function ScalesOfJustice() {
             <mesh material={goldMaterial} position={[0, -2, 0]} castShadow>
               <cylinderGeometry args={[1, 1, 0.1, 32]} />
             </mesh>
-            {/* Strings */}
             <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]}>
                <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
             </mesh>
@@ -177,7 +174,6 @@ function ScalesOfJustice() {
             <mesh material={goldMaterial} position={[0, -2, 0]} castShadow>
               <cylinderGeometry args={[1, 1, 0.1, 32]} />
             </mesh>
-            {/* Strings */}
             <mesh material={goldMaterial} position={[-0.9, -1, 0]} rotation={[0, 0, -0.4]}>
                <cylinderGeometry args={[0.01, 0.01, 2.2, 8]} />
             </mesh>
@@ -198,30 +194,42 @@ function Gavel(props) {
   useFrame(() => {
     const offset = scroll.offset; 
 
-    // Complex rotation
-    group.current.rotation.y = THREE.MathUtils.lerp(0, Math.PI * 2.5, offset);
-    group.current.rotation.x = THREE.MathUtils.lerp(0.2, -0.4, offset);
-    group.current.rotation.z = THREE.MathUtils.lerp(-0.4, 0.6, offset);
+    // Rotation
+    group.current.rotation.y = THREE.MathUtils.lerp(0, Math.PI * 2, offset);
+    group.current.rotation.x = THREE.MathUtils.lerp(0.2, -0.2, offset);
+    group.current.rotation.z = THREE.MathUtils.lerp(-0.4, 0.2, offset);
 
-    // Gavel weaves through the pillars
-    const startX = 3;
-    const endX = -3;
-    group.current.position.x = THREE.MathUtils.lerp(startX, endX, offset);
-    
-    // Strike animation at the end
-    if (offset > 0.8) {
-      const strikeProgress = (offset - 0.8) * 5; 
-      group.current.rotation.z -= Math.sin(strikeProgress * Math.PI) * 1.2;
-      group.current.position.y = -Math.sin(strikeProgress * Math.PI) * 2;
+    // Choreographed Positions:
+    // Page 1 (offset 0): Center, slightly below text
+    // Page 2 (offset 0.5): Move to Left side (x = -3, y = 1) to balance right-aligned text
+    // Page 3 (offset 1): Move back to Center (x = 0, y = -1.5) for the strike
+
+    if (offset < 0.5) {
+      // Transition from Page 1 to Page 2
+      const localOffset = offset * 2; // 0 to 1
+      group.current.position.x = THREE.MathUtils.lerp(0, -3.5, localOffset);
+      group.current.position.y = THREE.MathUtils.lerp(-2.5, 0.5, localOffset);
+      group.current.position.z = THREE.MathUtils.lerp(0, 2, localOffset);
     } else {
-      // Bob up and down while traversing
-      group.current.position.y = Math.sin(offset * Math.PI * 2) * 1.5;
+      // Transition from Page 2 to Page 3
+      const localOffset = (offset - 0.5) * 2; // 0 to 1
+      group.current.position.x = THREE.MathUtils.lerp(-3.5, 0, localOffset);
+      group.current.position.z = THREE.MathUtils.lerp(2, 0, localOffset);
+      
+      // Strike animation at the very end
+      if (localOffset > 0.8) {
+        const strikeProgress = (localOffset - 0.8) * 5; // 0 to 1
+        group.current.rotation.z -= Math.sin(strikeProgress * Math.PI) * 1.0;
+        group.current.position.y = THREE.MathUtils.lerp(0.5, -2, 0.8) - Math.sin(strikeProgress * Math.PI) * 1.5;
+      } else {
+        group.current.position.y = THREE.MathUtils.lerp(0.5, -2, localOffset);
+      }
     }
   });
 
   return (
     <group ref={group} {...props} dispose={null}>
-      <Float speed={3} rotationIntensity={0.5} floatIntensity={1}>
+      <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
         {/* Handle */}
         <mesh material={woodMaterial} position={[0, -2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.15, 0.2, 4, 32]} />
@@ -262,8 +270,9 @@ function SoundingBlock(props) {
 
   useFrame(() => {
     const offset = scroll.offset;
-    group.current.position.y = THREE.MathUtils.lerp(-8, -2.5, offset); // Rises up to catch the strike
-    group.current.position.x = THREE.MathUtils.lerp(0, -3, offset);
+    // Block waits below, rises up to center to catch the strike at the end
+    group.current.position.y = THREE.MathUtils.lerp(-10, -3.5, offset); 
+    group.current.position.x = THREE.MathUtils.lerp(0, 0, offset); // Stay center
   });
 
   return (
@@ -284,16 +293,17 @@ function HtmlContent() {
   
   return (
     <Scroll html style={{ width: '100%', height: '100%' }}>
-      {/* Page 1: Hero */}
-      <div className="w-screen h-screen flex flex-col justify-center px-10 md:px-32 relative pointer-events-none">
-        <div className="pointer-events-auto max-w-2xl bg-white/20 backdrop-blur-md p-8 rounded-3xl border border-white/50 shadow-2xl">
-          <h1 className="text-6xl md:text-8xl font-black font-serif text-slate-900 tracking-tighter mb-6 leading-[0.9]">
-            Justice.<br/>Redefined.
+      {/* Page 1: Hero (Centered) */}
+      <div className="w-screen h-screen flex flex-col justify-center items-center text-center px-10 relative pointer-events-none">
+        {/* Adjusted padding/margin so it sits nicely above the Gavel (which is at y=-2.5) */}
+        <div className="pointer-events-auto bg-white/40 backdrop-blur-md p-8 rounded-3xl border border-white/60 shadow-2xl max-w-3xl -mt-32">
+          <h1 className="text-5xl md:text-7xl font-black font-serif text-slate-900 tracking-tighter mb-6 leading-tight">
+            Justice. Redefined.
           </h1>
-          <p className="text-xl md:text-2xl font-medium text-slate-800 mb-10 max-w-xl">
+          <p className="text-xl md:text-2xl font-medium text-slate-800 mb-8">
             A premium digital advocate empowering citizens with scheme matching and legal intelligence.
           </p>
-          <div className="flex gap-4">
+          <div className="flex justify-center">
             <button onClick={() => navigate('/schemes')} className="bg-slate-900 text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-slate-800 transition-colors flex items-center gap-3 shadow-xl">
               Explore Schemes <ArrowRight className="w-5 h-5" />
             </button>
@@ -301,41 +311,41 @@ function HtmlContent() {
         </div>
       </div>
 
-      {/* Page 2: Features */}
+      {/* Page 2: Features (Right Aligned to balance Left-side 3D objects) */}
       <div className="w-screen h-screen flex flex-col justify-center px-10 md:px-32 relative pointer-events-none">
-        <div className="pointer-events-auto max-w-xl ml-auto md:mr-32 bg-white/30 backdrop-blur-lg p-10 rounded-3xl border border-white/60 shadow-2xl">
-          <h2 className="text-5xl md:text-7xl font-bold font-serif text-slate-900 mb-12">Total Mastery</h2>
+        <div className="pointer-events-auto max-w-xl ml-auto md:mr-16 bg-white/40 backdrop-blur-xl p-10 rounded-3xl border border-white/60 shadow-2xl">
+          <h2 className="text-4xl md:text-6xl font-bold font-serif text-slate-900 mb-10">Total Mastery</h2>
           
           <div className="space-y-8">
             <div className="flex gap-6 group cursor-pointer" onClick={() => navigate('/notices')}>
-              <div className="w-16 h-16 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
-                <Scale className="w-8 h-8 text-white" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
+                <Scale className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">Legal Assessor</h3>
-                <p className="text-slate-700 text-lg font-medium">Deconstruct complex court notices into actionable intelligence instantly.</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">Legal Assessor</h3>
+                <p className="text-slate-700 font-medium">Deconstruct complex court notices into actionable intelligence instantly.</p>
               </div>
             </div>
             
             <div className="flex gap-6 group cursor-pointer" onClick={() => navigate('/documents')}>
-              <div className="w-16 h-16 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-8 h-8 text-white" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 shadow-xl flex items-center justify-center shrink-0 border border-slate-700 group-hover:scale-110 transition-transform">
+                <ShieldCheck className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">Fraud Verifier</h3>
-                <p className="text-slate-700 text-lg font-medium">Cryptographically authenticate state documents and certificates.</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">Fraud Verifier</h3>
+                <p className="text-slate-700 font-medium">Cryptographically authenticate state documents and certificates.</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Page 3: Call to action */}
+      {/* Page 3: Call to action (Centered, sits above the striking gavel) */}
       <div className="w-screen h-screen flex flex-col justify-center items-center text-center px-10 relative pointer-events-none">
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-2xl p-16 rounded-[3rem] shadow-2xl border border-slate-700 max-w-4xl w-full">
-          <h2 className="text-5xl md:text-7xl font-bold font-serif text-white mb-8">Take Command</h2>
-          <p className="text-2xl text-slate-300 mb-12 font-light">Join thousands of citizens asserting their rights.</p>
-          <button onClick={() => navigate('/login')} className="bg-white text-slate-900 px-12 py-5 rounded-full text-xl font-bold hover:bg-slate-100 transition-all hover:scale-105 shadow-2xl">
+        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-2xl p-16 rounded-[3rem] shadow-2xl border border-slate-700 max-w-4xl w-full -mt-48">
+          <h2 className="text-5xl md:text-6xl font-bold font-serif text-white mb-6">Take Command</h2>
+          <p className="text-xl text-slate-300 mb-10 font-light">Join thousands of citizens asserting their rights.</p>
+          <button onClick={() => navigate('/login')} className="bg-white text-slate-900 px-10 py-4 rounded-full text-xl font-bold hover:bg-slate-100 transition-all hover:scale-105 shadow-2xl">
             Create Free Profile
           </button>
         </div>
