@@ -162,7 +162,7 @@ function App() {
           <Navigation />
 
           {/* Main Content */}
-          <main className="flex-grow w-full pb-16">
+          <main className={`flex-grow w-full ${location.pathname !== '/' ? 'pb-16' : ''}`}>
             <Routes>
               <Route path="/" element={<Home openBot={openBot} />} />
               <Route path="/login" element={<Login />} />
@@ -191,7 +191,7 @@ function App() {
           </main>
 
           {/* Advanced Footer */}
-          <Footer />
+          {location.pathname !== '/' && <Footer />}
 
           {/* Global Voice Assistant FAB */}
           <VoiceFAB setVoiceBotOpen={setVoiceBotOpen} isServiceBotOpen={isServiceBotOpen} offset={footerOffset} />
