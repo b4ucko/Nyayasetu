@@ -79,77 +79,50 @@ function ScrollObserver({ setFooterOffset }) {
   return null;
 }
 
-function Navigation({ theme, toggleTheme }) {
+function Navigation() {
   const { user, logout } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    // Check if script already exists to prevent duplicates on unmount/remount
-    if (!document.getElementById('google-translate-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-translate-script';
-      script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-      script.async = true;
-      document.body.appendChild(script);
-
-      window.googleTranslateElementInit = () => {
-        if (window.google && window.google.translate) {
-          new window.google.translate.TranslateElement(
-            {
-              pageLanguage: 'en',
-              includedLanguages: 'en,hi,mr,ta,te,bn,gu,kn,ml,ur',
-              layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
-            },
-            'google_translate_element'
-          );
-        }
-      };
-    }
-  }, []);
-
   const getLinkClasses = (path) => {
     const isActive = path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-    const baseClasses = "font-bold px-5 py-2 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg";
+    const baseClasses = "text-sm font-medium transition-colors duration-200 px-3 py-1.5 rounded-full";
     return isActive
-      ? `${baseClasses} bg-govblue text-white shadow-md hover:bg-blue-700`
-      : `${baseClasses} text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-govblue`;
+      ? `${baseClasses} text-white bg-white/10`
+      : `${baseClasses} text-neutral-400 hover:text-white hover:bg-white/5`;
   };
 
   return (
-    <nav className="glass-nav sticky top-0 z-50 transition-all duration-300">
-      <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <Link to="/" className="flex items-center space-x-3 group">
-          <img src="/logo.png" alt="Nyayasetu Logo" className="w-8 h-8 object-contain transform transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300" />
-          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight transition-colors">
-            Nyayasetu
-          </h1>
-        </Link>
-        <div className="hidden md:flex space-x-6 items-center">
-          {/* Google Translate Integration */}
-          <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 h-10 shadow-sm transition-colors hover:border-govblue">
-            <div id="google_translate_element" className="flex items-center translation-widget"></div>
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+      <div className="nav-pill px-6 py-3 flex items-center gap-8 shadow-2xl">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
+            <div className="w-3 h-3 bg-black rounded-full" />
           </div>
-
+          <span className="font-bold text-white tracking-tight">Nyayasetu</span>
+        </Link>
+        
+        <div className="hidden md:flex items-center gap-2">
           <Link to="/" className={getLinkClasses('/')}>Home</Link>
           {user ? (
             <>
               <Link to="/dashboard" className={getLinkClasses('/dashboard')}>Dashboard</Link>
-              <Link to="/notices" className={getLinkClasses('/notices')}>Notices</Link>
-              <button onClick={logout} className="font-bold text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg">Logout</button>
+              <Link to="/schemes" className={getLinkClasses('/schemes')}>Schemes</Link>
+              <Link to="/notices" className={getLinkClasses('/notices')}>Legal</Link>
             </>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-4 border-l border-white/10 pl-4">
+          <div id="google_translate_element" className="hidden lg:block"></div>
+          {user ? (
+            <button onClick={logout} className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
+              Logout
+            </button>
           ) : (
-            <Link to="/login" className="bg-govblue text-white font-bold px-5 py-2 rounded-xl hover:bg-blue-700 shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5">Sign Up Free</Link>
+            <Link to="/login" className="text-sm font-medium text-black bg-white px-4 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">
+              Sign In
+            </Link>
           )}
-
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-2"></div>
-
-          <button
-            onClick={toggleTheme}
-            className="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200 shadow-inner"
-            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
         </div>
       </div>
     </nav>
