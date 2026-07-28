@@ -17,7 +17,7 @@ import DocumentAnalyzer from './components/dashboard/DocumentAnalyzer';
 import NoticeChecker from './components/dashboard/NoticeChecker';
 import VoiceAssistant from './components/dashboard/VoiceAssistant';
 import ServiceBot from './components/ServiceBot';
-import CursorGlow from './components/CursorGlow';
+
 import Footer from './components/Footer';
 
 // Public legal/help pages
@@ -85,47 +85,52 @@ function Navigation() {
 
   const getLinkClasses = (path) => {
     const isActive = path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-    const baseClasses = "text-sm font-medium transition-colors duration-200 px-3 py-1.5 rounded-full";
+    const baseClasses = "text-sm font-medium transition-colors duration-200 px-3 py-2 rounded-md";
     return isActive
-      ? `${baseClasses} text-white bg-white/10`
-      : `${baseClasses} text-neutral-400 hover:text-white hover:bg-white/5`;
+      ? `${baseClasses} text-blue-900 bg-blue-50`
+      : `${baseClasses} text-slate-600 hover:text-blue-900 hover:bg-slate-50`;
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="nav-pill px-6 py-3 flex items-center gap-8 shadow-2xl">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-            <div className="w-3 h-3 bg-black rounded-full" />
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <div className="container mx-auto px-6 max-w-7xl h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-900 rounded flex items-center justify-center">
+            <span className="text-white font-bold font-serif text-lg leading-none">N</span>
           </div>
-          <span className="font-bold text-white tracking-tight">Nyayasetu</span>
+          <span className="font-bold text-slate-900 tracking-tight text-xl font-serif">Nyayasetu</span>
         </Link>
         
-        <div className="hidden md:flex items-center gap-2">
+        <nav className="hidden md:flex items-center gap-1">
           <Link to="/" className={getLinkClasses('/')}>Home</Link>
           {user ? (
             <>
               <Link to="/dashboard" className={getLinkClasses('/dashboard')}>Dashboard</Link>
-              <Link to="/schemes" className={getLinkClasses('/schemes')}>Schemes</Link>
-              <Link to="/notices" className={getLinkClasses('/notices')}>Legal</Link>
+              <Link to="/schemes" className={getLinkClasses('/schemes')}>Welfare Schemes</Link>
+              <Link to="/notices" className={getLinkClasses('/notices')}>Legal Notices</Link>
             </>
           ) : null}
-        </div>
+        </nav>
 
-        <div className="flex items-center gap-4 border-l border-white/10 pl-4">
+        <div className="flex items-center gap-4">
           <div id="google_translate_element" className="hidden lg:block"></div>
           {user ? (
-            <button onClick={logout} className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-              Logout
+            <button onClick={logout} className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-3 py-2">
+              Sign out
             </button>
           ) : (
-            <Link to="/login" className="text-sm font-medium text-black bg-white px-4 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">
-              Sign In
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                Sign in
+              </Link>
+              <Link to="/login" className="gov-button-primary">
+                Create Account
+              </Link>
+            </div>
           )}
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
 
@@ -145,43 +150,24 @@ function App() {
     setGlobalBotOpen(true);
   };
 
-  // Theme state
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
-
   // Footer avoidance state
   const [footerOffset, setFooterOffset] = useState(0);
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
 
   return (
     <AuthProvider>
       <Router>
         <ScrollToTop />
         <ScrollObserver setFooterOffset={setFooterOffset} />
-        <div className="min-h-screen flex flex-col relative overflow-hidden">
-          <CursorGlow />
-
-          <Navigation theme={theme} toggleTheme={toggleTheme} />
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          <Navigation />
 
           {/* Main Content */}
-          <main className="flex-grow container mx-auto px-4 sm:px-6 relative z-20 w-full pt-8 pb-16">
+          <main className="flex-grow w-full pb-16">
             <Routes>
               <Route path="/" element={<Home openBot={openBot} />} />
               <Route path="/login" element={<Login />} />
 
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
-                {/* Dashboard now exclusively renders ProfileBuilder as its index */}
                 <Route index element={<ProfileBuilder />} />
                 <Route path="profile" element={<ProfileBuilder />} />
               </Route>
@@ -221,10 +207,10 @@ function App() {
           {/* Voice Assistant Global Overlay */}
           {voiceBotOpen && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in transition-all">
-              <div className="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden border border-slate-200 dark:border-slate-700">
+              <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden border border-slate-200">
                 <button
                   onClick={() => setVoiceBotOpen(false)}
-                  className="absolute top-6 right-6 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 p-2 rounded-full transition-colors z-[110] flex items-center shadow-sm bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-600"
+                  className="absolute top-6 right-6 text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors z-[110] flex items-center shadow-sm bg-white border border-slate-200"
                   title="Close Voice Assistant"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

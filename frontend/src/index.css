@@ -1,15 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-color: #000000;
-  --text-primary: #EDEDED;
-  --text-secondary: #888888;
-  --border-color: #333333;
-  --accent-color: #FFFFFF;
+  --bg-color: #F8FAFC; /* slate-50 */
+  --text-primary: #0F172A; /* slate-900 */
+  --text-secondary: #475569; /* slate-600 */
+  --border-color: #E2E8F0; /* slate-200 */
+  --accent-color: #2563EB; /* blue-600 */
+  --surface-color: #FFFFFF;
 }
 
 body {
@@ -23,76 +24,70 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Geist', sans-serif;
-  letter-spacing: -0.02em;
+  font-family: 'Merriweather', serif;
+  color: #0F172A;
 }
 
 .font-mono-code {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Custom Scrollbar - Minimal */
+/* Custom Scrollbar - Standard Enterprise */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+  background: #CBD5E1;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #94A3B8;
 }
 
-/* Minimalist Panels */
-.minimal-panel {
-  background: rgba(25, 25, 25, 0.4);
+/* Standard Components (Anti-AI Slop) */
+.gov-card {
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease-in-out;
 }
 
-.minimal-panel:hover {
-  border-color: #555;
-  background: rgba(35, 35, 35, 0.4);
+.gov-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.bento-box {
-  background: #0A0A0A;
-  border: 1px solid #1A1A1A;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
+.gov-button-primary {
+  background-color: #1E3A8A; /* blue-900 */
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease-in-out;
 }
 
-.bento-box::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: 12px;
-  padding: 1px;
-  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+.gov-button-primary:hover {
+  background-color: #1E40AF; /* blue-800 */
 }
 
-/* Navigation */
-.nav-pill {
-  background: rgba(10, 10, 10, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 9999px;
+.gov-button-secondary {
+  background-color: white;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.15s ease-in-out;
 }
 
-/* Typography Utilities */
-.text-gradient-subtle {
-  background: linear-gradient(to right, #FFFFFF, #888888);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.gov-button-secondary:hover {
+  background-color: #F8FAFC;
+  border-color: #94A3B8;
 }
 
 /* Google Translate UI Cleanup */
@@ -116,12 +111,12 @@ body, html {
 }
 
 .goog-te-gadget .goog-te-combo {
-  background-color: #000;
-  color: #fff !important;
+  background-color: #FFFFFF;
+  color: #0F172A !important;
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 12px !important;
-  border: 1px solid #333;
+  border: 1px solid #CBD5E1;
   outline: none;
   cursor: pointer;
   margin: 0;
